@@ -80,25 +80,30 @@ class UnicornDashboard(ez.Unit):
         options: typing.List[str] = []
         self.STATE.device_select.options = options
 
-        process = await asyncio.create_subprocess_shell(
-            'bluetoothctl scan on',
+        process = await asyncio.create_subprocess_exec(
+            '/usr/bin/bluetoothctl',
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
         try:
             ez.logger.info('starting bluetooth discovery')
+            process.stdin.write('scan on\n'.encode())
+            await process.stdin.drain()
+
             while True:
                 data = await process.stdout.readline()
-
-                ez.logger.info('data')
 
                 if not data: 
                     break
 
                 data = data.decode('ascii').rstrip()
-                ez.logger.info(f"bluetoothctl: {data}")
-                options.append(data)
+
+                tokens = data.split(' ')
+                tag, ty = tokens[:2]
+                if 'NEW' in tag and ty == 'Device':                
+                    options.append(tokens[1])
 
             exit_code = await process.wait()
 
@@ -108,9 +113,9 @@ class UnicornDashboard(ez.Unit):
                 ez.logger.info(f'bluetooth discovery failure -- {err}')
         
         finally:
-            if process.returncode is None:
-                process.terminate()
-                await process.wait()
+            process.stdin.write('scan off\nexit\n'.encode())
+            process.stdin.drain()
+            await process.wait()
     
 
     # Scan Off
