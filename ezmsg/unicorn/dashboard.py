@@ -87,6 +87,7 @@ class UnicornDashboard(ez.Unit):
         )
 
         try:
+            ez.logger.info('starting bluetooth discovery')
             while True:
                 data = await process.stdout.readline()
 
@@ -102,7 +103,7 @@ class UnicornDashboard(ez.Unit):
             if exit_code:
                 err = await process.stderr.read()
                 err = err.decode('ascii').rstrip()
-                ez.logger.info(f'Bluetooth discovery failure -- {err}')
+                ez.logger.info(f'bluetooth discovery failure -- {err}')
         
         finally:
             if process.returncode is None:
