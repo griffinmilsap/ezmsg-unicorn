@@ -9,13 +9,13 @@ from ezmsg.unicorn.device import UnicornDeviceSettings
 
 class UnicornDashboardState(ez.State):
 
-    start_bt_button: pn.widgets.Button
     device_select: pn.widgets.Select
     address: pn.widgets.TextInput
     connect_button: pn.widgets.Button
     disconnect_button: pn.widgets.Button
 
     settings_queue: asyncio.Queue[UnicornDeviceSettings]
+    addresses: typing.Dict[str, str]
 
 
 class UnicornDashboard(ez.Unit):
@@ -25,14 +25,11 @@ class UnicornDashboard(ez.Unit):
 
     def initialize(self) -> None:
         
-        self.STATE.start_bt_button = pn.widgets.Button(name="Start Bluetooth Scan", button_type="primary", disabled=False, icon="bluetooth",icon_size='1.35em')        
-        
         self.STATE.device_select = pn.widgets.Select(name="Select Device", options=[], value=None, size=5)
         self.STATE.address = pn.widgets.TextInput(name='Device Address', placeholder="XX:XX:XX:XX:XX:XX")
         self.STATE.connect_button = pn.widgets.Button(name="Connect", button_type="success", disabled=False)
         self.STATE.disconnect_button = pn.widgets.Button(name="Disconnect", button_type="danger", disabled=False)
        
-        # self.STATE.start_bt_button.on_click(self.findDevicesStart)        
 
         self.STATE.connect_button.on_click(lambda _: 
             self.STATE.settings_queue.put_nowait(
@@ -49,10 +46,12 @@ class UnicornDashboard(ez.Unit):
         )
 
         async def on_select(value: Event):
-            self.STATE.address.value = value.new
+            self.STATE.address.value = self.STATE.addresses.get(value.new, '')
         self.STATE.device_select.param.watch(on_select, 'value')
 
         self.STATE.settings_queue = asyncio.Queue()
+
+        self.STATE.addresses = {}
 
     @ez.publisher(OUTPUT_SETTINGS)
     async def pub_settings(self) -> typing.AsyncGenerator:
@@ -64,7 +63,6 @@ class UnicornDashboard(ez.Unit):
         return pn.Row(
             pn.Column(
                 '# Unicorn Device Dashboard',
-                self.STATE.start_bt_button,
                 self.STATE.device_select,
                 self.STATE.address,
                 pn.Row(
@@ -79,6 +77,8 @@ class UnicornDashboard(ez.Unit):
 
         options: typing.List[str] = []
         self.STATE.device_select.options = options
+
+        self.STATE.addresses.clear()
 
         process = await asyncio.create_subprocess_exec(
             '/usr/bin/bluetoothctl',
@@ -101,9 +101,14 @@ class UnicornDashboard(ez.Unit):
                 data = data.decode('ascii').rstrip()
 
                 tokens = data.split(' ')
-                tag, ty = tokens[:2]
-                if 'NEW' in tag and ty == 'Device':                
-                    options.append(tokens[1])
+                _, tag, ty = tokens[:3]
+
+                if 'NEW' in tag and ty == 'Device':
+                    addr = tokens[3]
+                    name = ' '.join(tokens[4:])
+                    entry = f'{name} ({addr})'
+                    options.append(entry)
+                    self.STATE.addresses[entry] = addr
 
             exit_code = await process.wait()
 
@@ -114,40 +119,9 @@ class UnicornDashboard(ez.Unit):
         
         finally:
             process.stdin.write('scan off\nexit\n'.encode())
-            process.stdin.drain()
+            await process.stdin.drain()
             await process.wait()
-    
 
-    # Scan Off
-    async def scan_off(self):
-        await self.enable_bluetooth()
-        await self.bluetoothctl_command("scan off")
-
-
-    def findDevicesStop(self, event):
-        async def nearby_devices():
-
-            await self.scan_off()        
-            device_list = await self.bluetoothctl_command("devices")
-            
-            # mac address as both name and address
-            lines = device_list.split("\n")
-            self.STATE.device_dict = {}
-            for line in lines:
-                if "Device" in line:
-                    parts = line.split()
-                    
-                    if len(parts) >= 2:
-                        deviceAddress = parts[1]
-                        deviceName = parts[2]
-                        if "UN-" in deviceName:
-                            self.STATE.device_dict[deviceName] = deviceAddress
-
-                            self.STATE.device_select.options = list(self.STATE.device_dict.keys())
-                            self.STATE.device_select.value = None
-
-
-        asyncio.create_task(nearby_devices())
 
 if __name__ == '__main__':
     import argparse
@@ -174,7 +148,7 @@ if __name__ == '__main__':
     DASHBOARD = UnicornDashboard()
     DEVICE = UnicornDevice()
 
-    APP.panels = { 'Unicorn': DASHBOARD.panel }
+    APP.panels = { 'unicorn': DASHBOARD.panel }
 
     ez.run(
         app = APP,
