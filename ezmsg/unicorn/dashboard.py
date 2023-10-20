@@ -81,7 +81,7 @@ class UnicornDashboard(ez.Unit):
         self.STATE.device_select.options = options
 
         process = await asyncio.create_subprocess_shell(
-            f'bluetoothctl scan on',
+            'bluetoothctl scan on',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -90,6 +90,8 @@ class UnicornDashboard(ez.Unit):
             ez.logger.info('starting bluetooth discovery')
             while True:
                 data = await process.stdout.readline()
+
+                ez.logger.info('data')
 
                 if not data: 
                     break
