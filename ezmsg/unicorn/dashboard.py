@@ -8,12 +8,12 @@ from ezmsg.unicorn.device import UnicornDeviceSettings
 
 class UnicornDashboardState(ez.State):
 
-    #device_battery: pn.widgets.Gauge
     device_select: pn.widgets.Select
     stop_bt_button: pn.widgets.Button
     connect_button: pn.widgets.Button
     start_bt_button: pn.widgets.Button
     disconnect_button: pn.widgets.Button
+    address: pn.widgets.TextInput
     status_indicator: pn.widgets.TextInput
     bt_status_indicator: pn.widgets.TextInput
 
@@ -36,20 +36,25 @@ class UnicornDashboard(ez.Unit):
         self.STATE.status_indicator = pn.widgets.TextInput(name="Connection Status", value="Disconnected", disabled=True)
         self.STATE.connect_button = pn.widgets.Button(name="Connect", button_type="success", disabled=False)
         self.STATE.disconnect_button = pn.widgets.Button(name="Disconnect", button_type="danger", disabled=False)
-        #self.STATE.device_battery = pn.widgets.Gauge(name="Battery Level", start=0, end=100, value=0, colors=[(0.1, 'red'),(0.3, 'orange'),(0.7, 'gold'),(1, 'green')])
+
+        self.STATE.address = pn.widgets.TextInput(name = 'Device Address', placeholder="XX:XX:XX:XX:XX:XX")
        
         self.STATE.start_bt_button.on_click(self.findDevicesStart)        
         self.STATE.stop_bt_button.on_click(self.findDevicesStop)
 
-        self.STATE.connect_event = asyncio.Event()
-        def on_connect(event = None):
-            self.STATE.connect_event.set()
-        self.STATE.connect_button.on_click(on_connect)
+        self.STATE.connect_button.on_click(lambda _: 
+            self.STATE.settings_queue.put_nowait(
+                UnicornDeviceSettings(
+                    addr = self.STATE.address.value
+                )
+            )
+        )
 
-        self.STATE.disconnect_event = asyncio.Event()
-        def on_disconnect(event = None):
-            self.STATE.disconnect_event.set()
-        self.STATE.disconnect_button.on_click(on_disconnect)
+        self.STATE.disconnect_button.on_click(lambda _:
+            self.STATE.settings_queue.put_nowait(
+                UnicornDeviceSettings()
+            )                                 
+        )
 
         self.STATE.settings_queue = asyncio.Queue()
 
@@ -69,8 +74,11 @@ class UnicornDashboard(ez.Unit):
                 self.STATE.stop_bt_button,
                 self.STATE.device_select,
                 self.STATE.status_indicator,
-                self.STATE.connect_button,
-                self.STATE.disconnect_button,
+                self.STATE.address,
+                pn.Row(
+                    self.STATE.connect_button,
+                    self.STATE.disconnect_button,
+                )
             )
         )
     
@@ -79,8 +87,8 @@ class UnicornDashboard(ez.Unit):
     async def bluetoothctl_command(self, command):
         process = await asyncio.create_subprocess_shell(
             f'bluetoothctl {command}',
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
 
         stdout, stderr = await process.communicate()
@@ -169,10 +177,27 @@ class UnicornDashboard(ez.Unit):
         asyncio.create_task(nearby_devices())
 
 if __name__ == '__main__':
+    import argparse
     from ezmsg.panel.application import Application, ApplicationSettings
     from ezmsg.unicorn.device import UnicornDevice
 
-    APP = Application(ApplicationSettings(port = 0))
+    parser = argparse.ArgumentParser(
+        description = 'Unicorn Dashboard'
+    )
+
+    parser.add_argument(
+        '--port',
+        type = int,
+        help = 'Port to host visualization on. [0 = Any port]',
+        default = 0
+    )
+
+    class Args:
+        port: int
+
+    args = parser.parse_args(namespace = Args)
+
+    APP = Application(ApplicationSettings(port = args.port))
     DASHBOARD = UnicornDashboard()
     DEVICE = UnicornDevice()
 

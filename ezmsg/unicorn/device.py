@@ -27,6 +27,7 @@ _CALIBRATE_EEG = lambda x: x * (4500000.0 / 50331642.0)
 # In order to function with UnicornDashboard, 
 # all settings should have defaults
 class UnicornDeviceSettings(ez.Settings):
+    # if addr == None; don't connect to any device.
     addr: typing.Optional[str] = None # "XX:XX:XX:XX:XX:XX"
 
 
@@ -72,10 +73,11 @@ class UnicornDevice(ez.Unit):
             self.STATE.connect_event.clear()
             self.STATE.disconnect_event.clear()
 
-            if self.STATE.device_settings.addr is None:
+            if self.STATE.device_settings.addr in (None, ''):
                 ez.logger.debug(f"no device address specified")
                 continue
 
+            sock = None
             try: 
                 ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.addr}")
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
@@ -123,7 +125,8 @@ class UnicornDevice(ez.Unit):
                     yield self.OUTPUT_BATTERY, battery_level
 
             finally:
-                ez.logger.debug(f"stopping stream")
-                sock.send(b"\x63\x5C\xC5") # Stop acquisition
-                sock.close()
+                if sock:
+                    ez.logger.debug(f"stopping stream")
+                    sock.send(b"\x63\x5C\xC5") # Stop acquisition
+                    sock.close()
                         
