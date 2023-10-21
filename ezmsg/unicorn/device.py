@@ -84,7 +84,11 @@ class UnicornDevice(ez.Unit):
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM)
                 sock.connect((self.STATE.device_settings.addr, _UNICORN_PORT))
                 reader, writer = await asyncio.open_connection(sock = sock)
+            except OSError as e:
+                ez.logger.warning( f'could not open RFCOMM connection: {e.strerror}')
+                continue
 
+            try:
                 ez.logger.debug(f"starting stream")
                 writer.write(b'\x61\x7C\x87') # Start Acquisition
                 await writer.drain()
