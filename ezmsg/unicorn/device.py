@@ -71,7 +71,7 @@ class UnicornDevice(ez.Unit):
             self.STATE.connect_event.clear()
             self.STATE.disconnect_event.clear()
 
-            if self.STATE.device_settings.addr in (None, ''):
+            if self.STATE.device_settings.addr in (None, '', 'simulator'):
                 ez.logger.debug(f"no device address specified")
                 continue
 
@@ -86,8 +86,8 @@ class UnicornDevice(ez.Unit):
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM)
                 sock.connect((self.STATE.device_settings.addr, _UNICORN_PORT))
                 reader, writer = await asyncio.open_connection(sock = sock)
-            except OSError as e:
-                ez.logger.warning(f'could not open RFCOMM connection to {self.STATE.device_settings.addr}: {e.strerror}')
+            except Exception as e:
+                ez.logger.warning(f'could not open RFCOMM connection to {self.STATE.device_settings.addr}: {e}')
                 continue
 
             try:

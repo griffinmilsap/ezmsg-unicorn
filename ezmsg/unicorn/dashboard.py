@@ -7,9 +7,12 @@ import ezmsg.core as ez
 import panel as pn
 
 from param.parameterized import Event
-from ezmsg.unicorn.device import UnicornDeviceSettings
+from ezmsg.util.messages.axisarray import AxisArray
+from ezmsg.unicorn.device import UnicornDevice, UnicornDeviceSettings, _UNICORN_FS, _UNICORN_EEG_CHANNELS_COUNT
+from ezmsg.sigproc.synth import EEGSynth, EEGSynthSettings
+from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 
-class UnicornDashboardState(ez.State):
+class UnicornDiscoveryState(ez.State):
 
     device_select: pn.widgets.Select
     address: pn.widgets.TextInput
@@ -20,19 +23,18 @@ class UnicornDashboardState(ez.State):
     addresses: typing.Dict[str, str] = field(default_factory = dict)
 
 
-class UnicornDashboard(ez.Unit):
-    STATE: UnicornDashboardState
+class UnicornDiscovery(ez.Unit):
+    STATE: UnicornDiscoveryState
 
     OUTPUT_SETTINGS = ez.OutputStream(UnicornDeviceSettings)
 
     def initialize(self) -> None:
         
-        self.STATE.device_select = pn.widgets.Select(name="Select Device", options=[], value=None, size=5)
+        self.STATE.device_select = pn.widgets.Select(name="Nearby Devices", options=[], value=None, size=5)
         self.STATE.address = pn.widgets.TextInput(name='Device Address', placeholder="XX:XX:XX:XX:XX:XX")
         self.STATE.connect_button = pn.widgets.Button(name="Connect", button_type="success", disabled=False)
         self.STATE.disconnect_button = pn.widgets.Button(name="Disconnect", button_type="danger", disabled=False)
        
-
         self.STATE.connect_button.on_click(lambda _: 
             self.STATE.settings_queue.put_nowait(
                 UnicornDeviceSettings(
@@ -61,15 +63,13 @@ class UnicornDashboard(ez.Unit):
             yield self.OUTPUT_SETTINGS, settings
         
     def panel(self) -> pn.viewable.Viewable:
-        return pn.Row(
-            pn.Column(
-                '# Unicorn Device Dashboard',
-                self.STATE.device_select,
-                self.STATE.address,
-                pn.Row(
-                    self.STATE.connect_button,
-                    self.STATE.disconnect_button,
-                )
+        return pn.Column(
+            "__Unicorn Device Discovery__",
+            self.STATE.device_select,
+            self.STATE.address,
+            pn.Row(
+                self.STATE.connect_button,
+                self.STATE.disconnect_button,
             )
         )
     
@@ -78,8 +78,11 @@ class UnicornDashboard(ez.Unit):
 
         options: typing.List[str] = []
         self.STATE.device_select.options = options
-
         self.STATE.addresses.clear()
+
+        # Add simulator to the list
+        self.STATE.addresses['simulator'] = 'simulator'
+        options.append('simulator')
 
         process = await asyncio.create_subprocess_exec(
             '/usr/bin/bluetoothctl',
@@ -107,6 +110,7 @@ class UnicornDashboard(ez.Unit):
                 if 'NEW' in tag and ty == 'Device':
                     addr = tokens[3]
                     name = ' '.join(tokens[4:])
+                    # TODO: if 'UN-' in name:
                     entry = f'{name} ({addr})'
                     options.append(entry)
                     self.STATE.addresses[entry] = addr
@@ -124,13 +128,80 @@ class UnicornDashboard(ez.Unit):
             await process.wait()
 
 
+class UnicornSimulatorSwitchState(ez.State):
+    signal_queue: asyncio.Queue[AxisArray] = field(default_factory=asyncio.Queue)
+    output_simulator: bool = False
+
+class UnicornSimulatorSwitch(ez.Unit):
+
+    STATE: UnicornSimulatorSwitchState
+
+    INPUT_SETTINGS = ez.InputStream(UnicornDeviceSettings)
+    INPUT_SYNTH_SIGNAL = ez.InputStream(AxisArray)
+    INPUT_DEVICE_SIGNAL = ez.InputStream(AxisArray)
+    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
+
+    @ez.subscriber(INPUT_SETTINGS)
+    async def on_settings(self, msg: UnicornDeviceSettings) -> None:
+        self.STATE.output_simulator = msg.addr == 'simulator'
+
+    @ez.subscriber(INPUT_DEVICE_SIGNAL)
+    async def on_device_signal(self, msg: AxisArray) -> None:
+        if not self.STATE.output_simulator:
+            self.STATE.signal_queue.put_nowait(msg)
+
+    @ez.subscriber(INPUT_SYNTH_SIGNAL)
+    async def on_synth_signal(self, msg: AxisArray) -> None:
+        if self.STATE.output_simulator:
+            self.STATE.signal_queue.put_nowait(msg)
+
+    @ez.publisher(OUTPUT_SIGNAL)
+    async def pub_signal(self) -> typing.AsyncGenerator:
+        while True:
+            signal = await self.STATE.signal_queue.get()
+            yield self.OUTPUT_SIGNAL, signal
+
+
+class UnicornDashboard(ez.Collection):
+
+    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
+
+    PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = ''))
+
+    SIMSWITCH = UnicornSimulatorSwitch()
+    SYNTH = EEGSynth(
+        EEGSynthSettings(
+            fs = _UNICORN_FS, 
+            n_ch= _UNICORN_EEG_CHANNELS_COUNT, 
+            n_time = 1
+        )
+    )
+
+    DISCOVERY = UnicornDiscovery()
+    DEVICE = UnicornDevice()
+
+    def panel(self) -> pn.viewable.Viewable:
+        return pn.Row(
+            self.DISCOVERY.panel(),
+            self.PLOT.panel()
+        )
+
+    def network(self) -> ez.NetworkDefinition:
+        return (
+            (self.DISCOVERY.OUTPUT_SETTINGS, self.DEVICE.INPUT_SETTINGS),
+            (self.DISCOVERY.OUTPUT_SETTINGS, self.SIMSWITCH.INPUT_SETTINGS),
+            (self.SYNTH.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_SYNTH_SIGNAL),
+            (self.DEVICE.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_DEVICE_SIGNAL),
+            (self.SIMSWITCH.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
+            (self.SIMSWITCH.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL)
+        )
+
 if __name__ == '__main__':
     import argparse
     from ezmsg.panel.application import Application, ApplicationSettings
-    from ezmsg.unicorn.device import UnicornDevice
 
     parser = argparse.ArgumentParser(
-        description = 'Unicorn Dashboard'
+        description = 'Unicorn Data'
     )
 
     parser.add_argument(
@@ -147,15 +218,10 @@ if __name__ == '__main__':
 
     APP = Application(ApplicationSettings(port = args.port))
     DASHBOARD = UnicornDashboard()
-    DEVICE = UnicornDevice()
 
     APP.panels = { 'unicorn': DASHBOARD.panel }
 
     ez.run(
         app = APP,
         dashboard = DASHBOARD,
-        device = DEVICE,
-        connections = (
-            (DASHBOARD.OUTPUT_SETTINGS, DEVICE.INPUT_SETTINGS),
-        )
     )
