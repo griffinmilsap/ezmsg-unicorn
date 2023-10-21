@@ -76,16 +76,18 @@ class UnicornDevice(ez.Unit):
                 continue
 
             ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.addr}")
+
             
+
             try: 
                 # We choose to do this instead of using pybluez so that we can interact
                 # with RFCOMM using non-blocking async calls.  Currently, this is only
                 # supported on linux with python built with bluetooth support.
+                sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM)
                 reader, writer = await asyncio.open_connection(
                     host = self.STATE.device_settings.addr,
                     port = _UNICORN_PORT,
-                    family = socket.AF_BLUETOOTH,
-                    proto = socket.BTPROTO_RFCOMM
+                    sock = sock
                 )
 
                 ez.logger.debug(f"starting stream")
