@@ -1,6 +1,8 @@
 import asyncio
 import typing
 
+from dataclasses import field
+
 import ezmsg.core as ez
 import panel as pn
 
@@ -15,7 +17,7 @@ class UnicornDashboardState(ez.State):
     disconnect_button: pn.widgets.Button
 
     settings_queue: asyncio.Queue[UnicornDeviceSettings]
-    addresses: typing.Dict[str, str]
+    addresses: typing.Dict[str, str] = field(default_factory = dict)
 
 
 class UnicornDashboard(ez.Unit):
@@ -51,7 +53,6 @@ class UnicornDashboard(ez.Unit):
 
         self.STATE.settings_queue = asyncio.Queue()
 
-        self.STATE.addresses = {}
 
     @ez.publisher(OUTPUT_SETTINGS)
     async def pub_settings(self) -> typing.AsyncGenerator:

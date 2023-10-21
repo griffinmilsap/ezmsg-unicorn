@@ -3,8 +3,6 @@ import typing
 import asyncio
 import socket
 
-from dataclasses import dataclass, field
-
 import ezmsg.core as ez
 import numpy as np
 
@@ -77,22 +75,29 @@ class UnicornDevice(ez.Unit):
                 ez.logger.debug(f"no device address specified")
                 continue
 
-            sock = None
+            ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.addr}")
+            
             try: 
-                ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.addr}")
-                sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
-                # stream = await asyncio.open_connection(selected_device_addr, _UNICORN_PORT, sock = sock)
-                sock.connect((self.STATE.device_settings.addr, _UNICORN_PORT))
+                # We choose to do this instead of using pybluez so that we can interact
+                # with RFCOMM using non-blocking async calls.  Currently, this is only
+                # supported on linux with python built with bluetooth support.
+                reader, writer = await asyncio.open_connection(
+                    host = self.STATE.device_settings.addr,
+                    port = _UNICORN_PORT,
+                    family = socket.AF_BLUETOOTH,
+                    proto = socket.BTPROTO_RFCOMM
+                )
 
                 ez.logger.debug(f"starting stream")
-                sock.send(b'\x61\x7C\x87') # Start Acquisition
+                writer.write(b'\x61\x7C\x87') # Start Acquisition
+                await writer.drain()
             
                 while True:
 
                     if self.STATE.disconnect_event.is_set():
                         break
                     
-                    payload = sock.recv(45)
+                    payload = await reader.read(45)
 
                     eeg_data = np.array([[
                         _CALIBRATE_EEG(int.from_bytes(
@@ -125,8 +130,9 @@ class UnicornDevice(ez.Unit):
                     yield self.OUTPUT_BATTERY, battery_level
 
             finally:
-                if sock:
-                    ez.logger.debug(f"stopping stream")
-                    sock.send(b"\x63\x5C\xC5") # Stop acquisition
-                    sock.close()
+                ez.logger.debug(f"stopping stream")
+                writer.write(b"\x63\x5C\xC5") # Stop acquisition
+                await writer.drain()
+                writer.close()
+                await writer.wait_closed()
                         
