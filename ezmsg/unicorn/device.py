@@ -18,6 +18,7 @@ _UNICORN_BATTERY_LEVEL_OFFSET = _UNICORN_HEADER_LENGTH
 _UNICORN_BYTES_PER_EEG_CHANNEL = 3
 _UNICORN_EEG_OFFSET = _UNICORN_BATTERY_LEVEL_OFFSET + _UNICORN_BATTERY_LEVEL_LENGTH
 _UNICORN_FS = 250.0
+_UNICORN_PAYLOAD_LENGTH = 45
 
 _CALIBRATE_EEG = lambda x: x * (4500000.0 / 50331642.0)
 
@@ -27,6 +28,7 @@ _CALIBRATE_EEG = lambda x: x * (4500000.0 / 50331642.0)
 class UnicornDeviceSettings(ez.Settings):
     # if addr == None; don't connect to any device.
     addr: typing.Optional[str] = None # "XX:XX:XX:XX:XX:XX"
+    n_samp: int = 50
 
 
 class UnicornDeviceState(ez.State):
@@ -100,36 +102,38 @@ class UnicornDevice(ez.Unit):
                     if self.STATE.disconnect_event.is_set():
                         break
                     
-                    payload = await reader.read(45)
+                    block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
 
-                    eeg_data = np.array([[
-                        _CALIBRATE_EEG(int.from_bytes(
-                            payload[
-                                _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
-                                _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
-                            ], 
-                            byteorder='big', 
-                            signed=True
-                        )) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
-                    ]])
+                    battery_level = 0
+                    for payload in block[::_UNICORN_PAYLOAD_LENGTH]:
+                        eeg_data = np.array([[
+                            _CALIBRATE_EEG(int.from_bytes(
+                                payload[
+                                    _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
+                                    _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
+                                ], 
+                                byteorder='big', 
+                                signed=True
+                            )) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
+                        ]])
 
-                    battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
+                        battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
 
-                    samp_idx = int.from_bytes(payload[39:43], byteorder = 'little', signed = False)
-                    time = samp_idx / _UNICORN_FS
+                        samp_idx = int.from_bytes(payload[39:43], byteorder = 'little', signed = False)
+                        time = samp_idx / _UNICORN_FS
 
-                    time_axis = AxisArray.Axis.TimeAxis(
-                        fs = _UNICORN_FS,
-                        offset = time
-                    )
-                    
-                    eeg_message = AxisArray(
-                        data = eeg_data,
-                        dims = ['time', 'ch'],
-                        axes = {'time': time_axis}
-                    )
+                        time_axis = AxisArray.Axis.TimeAxis(
+                            fs = _UNICORN_FS,
+                            offset = time
+                        )
+                        
+                        eeg_message = AxisArray(
+                            data = eeg_data,
+                            dims = ['time', 'ch'],
+                            axes = {'time': time_axis}
+                        )
 
-                    yield self.OUTPUT_SIGNAL, eeg_message
+                        yield self.OUTPUT_SIGNAL, eeg_message
                     yield self.OUTPUT_BATTERY, battery_level
 
             finally:
