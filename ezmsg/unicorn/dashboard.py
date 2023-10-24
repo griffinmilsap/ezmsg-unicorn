@@ -79,7 +79,6 @@ class UnicornDiscovery(ez.Unit):
             )
         )
     
-    @ez.task
     async def discover_devices(self) -> None:
 
         options: typing.List[str] = []
@@ -227,7 +226,7 @@ class UnicornDashboard(ez.Collection):
         )
     
     def process_components(self) -> typing.Collection[Component]:
-        return (self.DEVICE, self.SYNTH )
+        return (self.DEVICE, self.SYNTH)
 
 if __name__ == '__main__':
     import argparse
