@@ -27,7 +27,7 @@ _CALIBRATE_EEG = lambda x: x * (4500000.0 / 50331642.0)
 # all settings should have defaults
 class UnicornDeviceSettings(ez.Settings):
     # if addr == None; don't connect to any device.
-    addr: typing.Optional[str] = None # "XX:XX:XX:XX:XX:XX"
+    address: typing.Optional[str] = None # "XX:XX:XX:XX:XX:XX"
     n_samp: int = 50
 
 
@@ -68,17 +68,23 @@ class UnicornDevice(ez.Unit):
     @ez.publisher(OUTPUT_BATTERY)
     async def handle_device(self) -> typing.AsyncGenerator:
 
+        if not hasattr(socket, 'AF_BLUETOOTH'):
+            ez.logger.error('Python was not built with Bluetooth support.')
+            return
+
         while True:
             await self.STATE.connect_event.wait()
             self.STATE.connect_event.clear()
             self.STATE.disconnect_event.clear()
 
-            if self.STATE.device_settings is None: continue
-            if self.STATE.device_settings.addr in (None, '', 'simulator'):
+            if (
+                self.STATE.device_settings is None or \
+                self.STATE.device_settings.address in (None, '', 'simulator')
+            ):
                 ez.logger.debug(f"no device address specified")
                 continue
 
-            ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.addr}")
+            ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.address}")
 
             try: 
                 # We choose to do this instead of using pybluez so that we can interact
@@ -87,10 +93,10 @@ class UnicornDevice(ez.Unit):
                 # NOTE: sock.connect is blocking and could take a long time to return...
                 #     - this unit should probably live in its own process because of this...
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM) # type: ignore
-                sock.connect((self.STATE.device_settings.addr, _UNICORN_PORT))
+                sock.connect((self.STATE.device_settings.address, _UNICORN_PORT))
                 reader, writer = await asyncio.open_connection(sock = sock)
             except Exception as e:
-                ez.logger.warning(f'could not open RFCOMM connection to {self.STATE.device_settings.addr}: {e}')
+                ez.logger.warning(f'could not open RFCOMM connection to {self.STATE.device_settings.address}: {e}')
                 continue
 
             try:
@@ -145,4 +151,57 @@ class UnicornDevice(ez.Unit):
                 await writer.drain()
                 writer.close()
                 await writer.wait_closed()
+
                         
+if __name__ == '__main__':
+
+    import argparse
+
+    from ezmsg.util.debuglog import DebugLog
+
+    parser = argparse.ArgumentParser(
+        description = 'Unicorn Device'
+    )
+
+    device_group = parser.add_argument_group('device')
+
+    device_group.add_argument(
+        '-a', '--address',
+        type = str,
+        help = 'bluetooth address of Unicorn to stream data from (XX:XX:XX:XX:XX:XX)',
+    )
+
+    device_group.add_argument(
+        '--n_samp',
+        type = int,
+        help = 'number of data frames per message',
+        default = 50
+    )
+
+    class Args:
+        address: typing.Optional[str]
+        n_samp: int
+
+    args = parser.parse_args(namespace = Args)
+
+    if args.address in (None, '', 'simulator'):
+        ez.logger.error('no device to connect to; exiting.')
+        
+    else:
+        DEVICE = UnicornDevice(
+            UnicornDeviceSettings(
+                args.address,
+                args.n_samp
+            )
+        )
+
+        LOG = DebugLog()
+
+        ez.run(
+            device = DEVICE,
+            log = LOG,
+            connections=(
+                (DEVICE.OUTPUT_SIGNAL, LOG.INPUT),
+                (DEVICE.OUTPUT_BATTERY, LOG.INPUT)
+            )
+        )
