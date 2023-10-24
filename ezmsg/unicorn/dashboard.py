@@ -24,6 +24,8 @@ class UnicornDiscoveryState(ez.State):
     disconnect_button: pn.widgets.Button
 
     settings_queue: asyncio.Queue[UnicornDeviceSettings]
+
+    options: typing.List[str] = field(default_factory=list)
     addresses: typing.Dict[str, str] = field(default_factory = dict)
 
 
@@ -39,7 +41,7 @@ class UnicornDiscovery(ez.Unit):
 
     def initialize(self) -> None:
         
-        self.STATE.device_select = pn.widgets.Select(name="Nearby Devices", options=[], value=[], size=5)
+        self.STATE.device_select = pn.widgets.Select(name="Nearby Devices", options=self.STATE.options, value=None, size=5)
         self.STATE.scan_button = pn.widgets.Button(name="Bluetooth Scan", button_type='primary', sizing_mode='stretch_width')
         self.STATE.scan_progress = pn.indicators.Progress(value = 0, max = 100, sizing_mode='stretch_width')
         self.STATE.address = pn.widgets.TextInput(name='Device Address', placeholder="XX:XX:XX:XX:XX:XX")
@@ -87,6 +89,10 @@ class UnicornDiscovery(ez.Unit):
 
         self.STATE.settings_queue = asyncio.Queue()
 
+        # Add simulator to the list
+        self.STATE.addresses['simulator'] = 'simulator'
+        self.STATE.options.append('simulator')
+
     @ez.publisher(OUTPUT_SETTINGS)
     async def pub_settings(self) -> typing.AsyncGenerator:
         while True:
@@ -108,14 +114,6 @@ class UnicornDiscovery(ez.Unit):
         )
     
     async def discover_devices(self) -> None:
-
-        options: typing.List[str] = []
-        self.STATE.device_select.options = options
-        self.STATE.addresses.clear()
-
-        # Add simulator to the list
-        self.STATE.addresses['simulator'] = 'simulator'
-        options.append('simulator')
 
         process = await asyncio.create_subprocess_exec(
             '/usr/bin/bluetoothctl',
@@ -149,11 +147,11 @@ class UnicornDiscovery(ez.Unit):
                     name = ' '.join(tokens[4:])
                     # if 'UN-' in name:
                     entry = f'{name} ({addr})'
-                    options.append(entry)
+                    self.STATE.options.append(entry)
                     self.STATE.addresses[entry] = addr
 
                     # force refresh currently-loaded dashboards
-                    self.STATE.device_select.options = options
+                    self.STATE.device_select.options = self.STATE.options
 
             exit_code = await process.wait()
 
