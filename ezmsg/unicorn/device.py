@@ -113,9 +113,10 @@ class UnicornDevice(ez.Unit):
 
                     battery_level = 0
                     bounds = np.arange(self.STATE.device_settings.n_samp + 1) * _UNICORN_PAYLOAD_LENGTH
+                    eeg_frames = []
                     for start, stop in zip(bounds[:-1], bounds[1:]):
                         payload = block[int(start):int(stop)]
-                        eeg_data = np.array([[
+                        eeg_frames.append(np.array([
                             int.from_bytes(
                                 payload[
                                     _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
@@ -124,25 +125,25 @@ class UnicornDevice(ez.Unit):
                                 byteorder='big', 
                                 signed=True
                             ) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
-                        ]])
+                        ]))
 
                         battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
 
-                        samp_idx = int.from_bytes(payload[39:43], byteorder = 'little', signed = False)
-                        time = samp_idx / _UNICORN_FS
+                    samp_idx = int.from_bytes(block[39:43], byteorder = 'little', signed = False)
+                    time = samp_idx / _UNICORN_FS
 
-                        time_axis = AxisArray.Axis.TimeAxis(
-                            fs = _UNICORN_FS,
-                            offset = time
-                        )
+                    time_axis = AxisArray.Axis.TimeAxis(
+                        fs = _UNICORN_FS,
+                        offset = time
+                    )
                         
-                        eeg_message = AxisArray(
-                            data = _CALIBRATE_EEG(eeg_data),
-                            dims = ['time', 'ch'],
-                            axes = {'time': time_axis}
-                        )
+                    eeg_message = AxisArray(
+                        data = _CALIBRATE_EEG(np.array(eeg_frames)),
+                        dims = ['time', 'ch'],
+                        axes = {'time': time_axis}
+                    )
 
-                        yield self.OUTPUT_SIGNAL, eeg_message
+                    yield self.OUTPUT_SIGNAL, eeg_message
                     yield self.OUTPUT_BATTERY, battery_level
 
             finally:
