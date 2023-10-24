@@ -73,6 +73,7 @@ class UnicornDevice(ez.Unit):
             self.STATE.connect_event.clear()
             self.STATE.disconnect_event.clear()
 
+            if self.STATE.device_settings is None: continue
             if self.STATE.device_settings.addr in (None, '', 'simulator'):
                 ez.logger.debug(f"no device address specified")
                 continue
@@ -85,7 +86,7 @@ class UnicornDevice(ez.Unit):
                 # supported on linux with python built with bluetooth support.
                 # NOTE: sock.connect is blocking and could take a long time to return...
                 #     - this unit should probably live in its own process because of this...
-                sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM)
+                sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM) # type: ignore
                 sock.connect((self.STATE.device_settings.addr, _UNICORN_PORT))
                 reader, writer = await asyncio.open_connection(sock = sock)
             except Exception as e:
@@ -105,7 +106,9 @@ class UnicornDevice(ez.Unit):
                     block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
 
                     battery_level = 0
-                    for payload in block[::_UNICORN_PAYLOAD_LENGTH]:
+                    bounds = np.arange(self.STATE.device_settings.n_samp + 1) * _UNICORN_PAYLOAD_LENGTH
+                    for start, stop in zip(bounds[:-1], bounds[1:]):
+                        payload = block[int(start):int(stop)]
                         eeg_data = np.array([[
                             _CALIBRATE_EEG(int.from_bytes(
                                 payload[

@@ -91,6 +91,10 @@ class UnicornDiscovery(ez.Unit):
             stderr=asyncio.subprocess.PIPE,
         )
 
+        if process.stdin is None or process.stdout is None or process.stderr is None:
+            ez.logger.warning('failed to discover devices: could not open pipes to bluetoothctl')
+            return
+
         try:
             ez.logger.info('starting bluetooth discovery')
             process.stdin.write('scan on\n'.encode())
