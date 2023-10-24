@@ -120,13 +120,13 @@ class UnicornDiscovery(ez.Unit):
                 if 'NEW' in tag and ty == 'Device':
                     addr = tokens[3]
                     name = ' '.join(tokens[4:])
-                    if 'UN-' in name:
-                        entry = f'{name} ({addr})'
-                        options.append(entry)
-                        self.STATE.addresses[entry] = addr
+                    # if 'UN-' in name:
+                    entry = f'{name} ({addr})'
+                    options.append(entry)
+                    self.STATE.addresses[entry] = addr
 
-                        # force refresh currently-loaded dashboards
-                        self.STATE.device_select.options = options
+                    # force refresh currently-loaded dashboards
+                    self.STATE.device_select.options = options
 
             exit_code = await process.wait()
 
