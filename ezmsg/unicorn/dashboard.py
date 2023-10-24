@@ -16,7 +16,9 @@ from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 
 class UnicornDiscoveryState(ez.State):
 
-    device_select: pn.widgets.Select
+    device_select: pn.widgets.MultiSelect
+    scan_button: pn.widgets.Button
+    scan_progress: pn.indicators.Progress
     address: pn.widgets.TextInput
     connect_button: pn.widgets.Button
     disconnect_button: pn.widgets.Button
@@ -37,10 +39,12 @@ class UnicornDiscovery(ez.Unit):
 
     def initialize(self) -> None:
         
-        self.STATE.device_select = pn.widgets.Select(name="Nearby Devices", options=[], value=None, size=5)
+        self.STATE.device_select = pn.widgets.MultiSelect(name="Nearby Devices", options=[], value=[], size=5)
+        self.STATE.scan_button = pn.widgets.Button(name="Bluetooth Scan", button_type='primary', sizing_mode='stretch_width')
+        self.STATE.scan_progress = pn.indicators.Progress(value = 0, max = 100, sizing_mode='stretch_width')
         self.STATE.address = pn.widgets.TextInput(name='Device Address', placeholder="XX:XX:XX:XX:XX:XX")
-        self.STATE.connect_button = pn.widgets.Button(name="Connect", button_type="success", disabled=False)
-        self.STATE.disconnect_button = pn.widgets.Button(name="Disconnect", button_type="danger", disabled=False)
+        self.STATE.connect_button = pn.widgets.Button(name="Connect", button_type="success", disabled=False, sizing_mode='stretch_width')
+        self.STATE.disconnect_button = pn.widgets.Button(name="Disconnect", button_type="danger", disabled=False, sizing_mode='stretch_width')
        
         self.STATE.connect_button.on_click(lambda _: 
             self.STATE.settings_queue.put_nowait( replace(
@@ -55,6 +59,27 @@ class UnicornDiscovery(ez.Unit):
                 address = None
             ))                
         )
+
+        async def scan(value: Event):
+            scan_time = 5.0 # sec
+            poll_time = 0.2 # sec
+
+            self.STATE.scan_button.disabled = True
+
+            max_itrs = int(scan_time / poll_time)
+            self.STATE.scan_progress.max = max_itrs - 1
+
+            try:
+                discovery = asyncio.create_task(self.discover_devices())
+                for itr in range(max_itrs):
+                    await asyncio.sleep(poll_time)
+                    self.STATE.scan_progress.value = itr
+                discovery.cancel()
+                await discovery
+            finally:
+                self.STATE.scan_button.disabled = False
+
+        self.STATE.scan_button.on_click(scan) # type: ignore
 
         async def on_select(value: Event):
             self.STATE.address.value = self.STATE.addresses.get(value.new, '')
@@ -72,11 +97,14 @@ class UnicornDiscovery(ez.Unit):
         return pn.Column(
             "__Unicorn Device Discovery__",
             self.STATE.device_select,
+            self.STATE.scan_button,
+            self.STATE.scan_progress,
             self.STATE.address,
             pn.Row(
                 self.STATE.connect_button,
                 self.STATE.disconnect_button,
-            )
+            ),
+            width = 325
         )
     
     async def discover_devices(self) -> None:
