@@ -16,7 +16,7 @@ from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 
 class UnicornDiscoveryState(ez.State):
 
-    device_select: pn.widgets.MultiSelect
+    device_select: pn.widgets.Select
     scan_button: pn.widgets.Button
     scan_progress: pn.indicators.Progress
     address: pn.widgets.TextInput
@@ -39,7 +39,7 @@ class UnicornDiscovery(ez.Unit):
 
     def initialize(self) -> None:
         
-        self.STATE.device_select = pn.widgets.MultiSelect(name="Nearby Devices", options=[], value=[], size=5)
+        self.STATE.device_select = pn.widgets.Select(name="Nearby Devices", options=[], value=[], size=5)
         self.STATE.scan_button = pn.widgets.Button(name="Bluetooth Scan", button_type='primary', sizing_mode='stretch_width')
         self.STATE.scan_progress = pn.indicators.Progress(value = 0, max = 100, sizing_mode='stretch_width')
         self.STATE.address = pn.widgets.TextInput(name='Device Address', placeholder="XX:XX:XX:XX:XX:XX")
