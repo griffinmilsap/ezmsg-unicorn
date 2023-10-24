@@ -80,6 +80,7 @@ class UnicornDiscovery(ez.Unit):
                 await discovery
             finally:
                 self.STATE.scan_button.disabled = False
+                self.STATE.device_select.options = list(self.STATE.addresses.keys())
 
         self.STATE.scan_button.on_click(scan) # type: ignore
 
@@ -147,11 +148,8 @@ class UnicornDiscovery(ez.Unit):
                     name = ' '.join(tokens[4:])
                     # if 'UN-' in name:
                     entry = f'{name} ({addr})'
-                    self.STATE.options.append(entry)
                     self.STATE.addresses[entry] = addr
-
-                    # force refresh currently-loaded dashboards
-                    self.STATE.device_select.options = self.STATE.options
+                    self.STATE.device_select.options = list(self.STATE.addresses.keys())
 
             exit_code = await process.wait()
 
