@@ -116,14 +116,14 @@ class UnicornDevice(ez.Unit):
                     for start, stop in zip(bounds[:-1], bounds[1:]):
                         payload = block[int(start):int(stop)]
                         eeg_data = np.array([[
-                            _CALIBRATE_EEG(int.from_bytes(
+                            int.from_bytes(
                                 payload[
                                     _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
                                     _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
                                 ], 
                                 byteorder='big', 
                                 signed=True
-                            )) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
+                            ) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
                         ]])
 
                         battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
@@ -137,7 +137,7 @@ class UnicornDevice(ez.Unit):
                         )
                         
                         eeg_message = AxisArray(
-                            data = eeg_data,
+                            data = _CALIBRATE_EEG(eeg_data),
                             dims = ['time', 'ch'],
                             axes = {'time': time_axis}
                         )
