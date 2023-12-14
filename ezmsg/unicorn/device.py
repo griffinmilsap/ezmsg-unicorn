@@ -32,7 +32,7 @@ _CALIBRATE_ACC = lambda x: x * (1.0 / 4096.0)
 _CALIBRATE_GYR = lambda x: x * (1.0 / 32.8)
 
 
-# In order to function with UnicornDashboard, 
+# In order to function with UnicornDashboard,
 # all settings should have defaults
 class UnicornDeviceSettings(ez.Settings):
     # if addr == None; don't connect to any device.
@@ -67,7 +67,7 @@ class UnicornDevice(ez.Unit):
         await self.reconnect(msg)
 
     # Settings can be applied during unit creation, or sent at runtime
-    # by other publishers.  Any time we get a new device settings, we 
+    # by other publishers.  Any time we get a new device settings, we
     # disconnect from current device and attempt to connect to the new device
     async def reconnect(self, settings: UnicornDeviceSettings) -> None:
         self.STATE.disconnect_event.set()
@@ -98,7 +98,7 @@ class UnicornDevice(ez.Unit):
 
             ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.address}")
 
-            try: 
+            try:
                 # We choose to do this instead of using pybluez so that we can interact
                 # with RFCOMM using non-blocking async calls.  Currently, this is only
                 # supported on linux with python built with bluetooth support.
@@ -135,8 +135,8 @@ class UnicornDevice(ez.Unit):
                                 payload[
                                     _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
                                     _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
-                                ], 
-                                byteorder='big', 
+                                ],
+                                byteorder='big',
                                 signed=True
                             ) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
                         ]))
@@ -183,13 +183,13 @@ class UnicornDevice(ez.Unit):
 
                     acc_message = AxisArray(
                         data=_CALIBRATE_ACC(np.array(accel_frames)),
-                        dims=['time', 'acc'],
+                        dims=['time', 'ch'],
                         axes={'time': time_axis}
                                 )
 
                     gyr_message = AxisArray(
                         data=_CALIBRATE_GYR(np.array(gyro_frames)),
-                        dims=['time', 'gyr'],
+                        dims=['time', 'ch'],
                         axes={'time': time_axis}
                     )
 
