@@ -56,7 +56,8 @@ class UnicornDevice(ez.Unit):
     OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
     OUTPUT_BATTERY = ez.OutputStream(float)
-
+    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray
+                                           )
     async def initialize(self) -> None:
         self.STATE.connect_event = asyncio.Event()
         self.STATE.disconnect_event = asyncio.Event()
@@ -77,7 +78,7 @@ class UnicornDevice(ez.Unit):
     @ez.publisher(OUTPUT_GYROSCOPE)
     @ez.publisher(OUTPUT_SIGNAL)
     @ez.publisher(OUTPUT_BATTERY)
-    
+    @ez.publisher(OUTPUT_ACCELEROMETER)
     async def handle_device(self) -> typing.AsyncGenerator:
 
         if not hasattr(socket, 'AF_BLUETOOTH'):
@@ -196,6 +197,7 @@ class UnicornDevice(ez.Unit):
                     yield self.OUTPUT_SIGNAL, eeg_message
                     yield self.OUTPUT_BATTERY, battery_level
                     yield self.OUTPUT_GYROSCOPE, gyr_message
+                    yield self.OUTPUT_ACCELEROMETER, acc_message
 
   
             finally:
@@ -256,6 +258,7 @@ if __name__ == '__main__':
             connections=(
                 (DEVICE.OUTPUT_SIGNAL, LOG.INPUT),
                 (DEVICE.OUTPUT_BATTERY, LOG.INPUT),
-                (DEVICE.OUTPUT_GYROSCOPE, LOG.INPUT)
+                (DEVICE.OUTPUT_GYROSCOPE, LOG.INPUT),
+                (DEVICE.OUTPUT_ACCELEROMETER, LOG.INPUT)
             )
         )
