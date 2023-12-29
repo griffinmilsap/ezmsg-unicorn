@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ezmsg-unicorn"
+version = "0.2.0"
+description = "g.tec Unicorn integration for ezmsg"
+authors = ["Miguel Wimbish <miguel.wimbish@jhuapl.edu>", "Griffin Milsap <griffin.milsap@jhuapl.edu>"]
+readme = "README.md"
+homepage = "https://github.com/griffinmilsap/ezmsg-unicorn"
+packages = [
+  { include = "ezmsg", from = "src" }
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+ezmsg = "^3.3.3"
+panel = { python = "^3.9", version = "^1.2.3", optional = true }
+ezmsg-sigproc = { version = "^1.2.2", optional = true }
+ezmsg-panel = { python = "^3.9", git = "https://github.com/griffinmilsap/ezmsg-panel.git", rev = "main", optional = true }
+
+
+[tool.poetry.extras]
+dashboard = [ "ezmsg-sigproc", "ezmsg-panel", "panel" ]
+
+
+[build-system] 
+requires = ["poetry-core"] 
+build-backend = "poetry.core.masonry.api"
