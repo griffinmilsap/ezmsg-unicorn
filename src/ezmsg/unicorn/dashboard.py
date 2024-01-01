@@ -211,6 +211,8 @@ class UnicornDashboard(ez.Collection, Tab):
     SETTINGS: UnicornDashboardSettings
 
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
+    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
+    OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
 
     PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = ''))
 
@@ -262,7 +264,9 @@ class UnicornDashboard(ez.Collection, Tab):
             (self.SYNTH.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_SYNTH_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_DEVICE_SIGNAL),
             (self.SIMSWITCH.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
-            (self.SIMSWITCH.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL)
+            (self.SIMSWITCH.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
+            (self.DEVICE.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
+            (self.DEVICE.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
         )
     
     def process_components(self) -> typing.Collection[Component]:
@@ -271,6 +275,10 @@ class UnicornDashboard(ez.Collection, Tab):
 
 class UnicornDashboardApp(ez.Collection, TabbedApp):
     SETTINGS: UnicornDashboardSettings
+
+    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
+    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
+    OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
 
     DASHBOARD = UnicornDashboard()
 
@@ -286,6 +294,13 @@ class UnicornDashboardApp(ez.Collection, TabbedApp):
         return [
             self.DASHBOARD,
         ]
+    
+    def network(self) -> ez.NetworkDefinition:
+        return (
+            (self.DASHBOARD.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
+            (self.DASHBOARD.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
+            (self.DASHBOARD.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
+        )
 
 if __name__ == '__main__':
     import argparse

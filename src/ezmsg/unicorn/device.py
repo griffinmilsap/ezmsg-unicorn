@@ -56,8 +56,8 @@ class UnicornDevice(ez.Unit):
     OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
     OUTPUT_BATTERY = ez.OutputStream(float)
-    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray
-                                           )
+    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
+
     async def initialize(self) -> None:
         self.STATE.connect_event = asyncio.Event()
         self.STATE.disconnect_event = asyncio.Event()
@@ -183,15 +183,15 @@ class UnicornDevice(ez.Unit):
                     )
 
                     acc_message = AxisArray(
-                        data=_CALIBRATE_ACC(np.array(accel_frames)),
-                        dims=['time', 'ch'],
-                        axes={'time': time_axis}
-                                )
+                        data = _CALIBRATE_ACC(np.array(accel_frames)),
+                        dims = ['time', 'ch'],
+                        axes = {'time': time_axis}
+                    )
 
                     gyr_message = AxisArray(
-                        data=_CALIBRATE_GYR(np.array(gyro_frames)),
-                        dims=['time', 'ch'],
-                        axes={'time': time_axis}
+                        data = _CALIBRATE_GYR(np.array(gyro_frames)),
+                        dims = ['time', 'ch'],
+                        axes = {'time': time_axis}
                     )
 
                     yield self.OUTPUT_SIGNAL, eeg_message
