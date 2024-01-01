@@ -12,6 +12,7 @@ from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.unicorn.device import UnicornDevice, UnicornDeviceSettings, _UNICORN_FS, _UNICORN_EEG_CHANNELS_COUNT
 from ezmsg.sigproc.synth import EEGSynth, EEGSynthSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
+from ezmsg.panel.tabbedapp import Tab, TabbedApp
 
 
 class UnicornDiscoveryState(ez.State):
@@ -100,9 +101,8 @@ class UnicornDiscovery(ez.Unit):
             settings = await self.STATE.settings_queue.get()
             yield self.OUTPUT_SETTINGS, settings
         
-    def panel(self) -> pn.viewable.Viewable:
-        return pn.Column(
-            "__Unicorn Device Discovery__",
+    def controls(self) -> pn.viewable.Viewable:
+        return pn.Card(
             self.STATE.device_select,
             self.STATE.scan_button,
             self.STATE.scan_progress,
@@ -111,7 +111,8 @@ class UnicornDiscovery(ez.Unit):
                 self.STATE.connect_button,
                 self.STATE.disconnect_button,
             ),
-            width = 325
+            title = "Unicorn Device Discovery",
+            sizing_mode = 'stretch_width'
         )
     
     async def discover_devices(self) -> None:
@@ -200,10 +201,12 @@ class UnicornSimulatorSwitch(ez.Unit):
 
 
 class UnicornDashboardSettings(ez.Settings):
-    device_settings: UnicornDeviceSettings
+    device_settings: UnicornDeviceSettings = field(
+        default_factory = UnicornDeviceSettings
+    )
 
 
-class UnicornDashboard(ez.Collection):
+class UnicornDashboard(ez.Collection, Tab):
 
     SETTINGS: UnicornDashboardSettings
 
@@ -233,10 +236,23 @@ class UnicornDashboard(ez.Collection):
             )
         )
 
+    @property
+    def tab_name(self) -> str:
+        return 'Unicorn Device'
+    
+    def sidebar(self) -> pn.viewable.Viewable:
+        return pn.Column(
+            self.DISCOVERY.controls(),
+            self.PLOT.sidebar(),
+        )
+    
+    def content(self) -> pn.viewable.Viewable:
+        return self.PLOT.content()
+
     def panel(self) -> pn.viewable.Viewable:
         return pn.Row(
-            self.DISCOVERY.panel(),
-            self.PLOT.panel()
+            self.sidebar(),
+            self.content(),
         )
 
     def network(self) -> ez.NetworkDefinition:
@@ -252,9 +268,29 @@ class UnicornDashboard(ez.Collection):
     def process_components(self) -> typing.Collection[Component]:
         return (self.DEVICE, self.SYNTH)
 
+
+class UnicornDashboardApp(ez.Collection, TabbedApp):
+    SETTINGS: UnicornDashboardSettings
+
+    DASHBOARD = UnicornDashboard()
+
+    @property
+    def title(self) -> str:
+        return 'Unicorn Dashboard'
+
+    def configure(self) -> None:
+        self.DASHBOARD.apply_settings(self.SETTINGS)
+
+    @property
+    def tabs(self) -> typing.List[Tab]:
+        return [
+            self.DASHBOARD,
+        ]
+
 if __name__ == '__main__':
     import argparse
     from ezmsg.panel.application import Application, ApplicationSettings
+
 
     parser = argparse.ArgumentParser(
         description = 'Unicorn Dashboard'
@@ -293,7 +329,7 @@ if __name__ == '__main__':
     args = parser.parse_args(namespace = Args)
 
     APP = Application(ApplicationSettings(port = args.port))
-    DASHBOARD = UnicornDashboard(
+    DASHBOARD_APP = UnicornDashboardApp(
         UnicornDashboardSettings(
             device_settings = UnicornDeviceSettings(
                 address = args.address,
@@ -302,9 +338,9 @@ if __name__ == '__main__':
         )
     )
 
-    APP.panels = { 'unicorn': DASHBOARD.panel }
+    APP.panels = { 'unicorn_device': DASHBOARD_APP.app }
 
     ez.run(
         app = APP,
-        dashboard = DASHBOARD,
+        dashboard = DASHBOARD_APP,
     )
