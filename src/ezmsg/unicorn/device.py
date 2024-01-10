@@ -99,113 +99,118 @@ class UnicornDevice(ez.Unit):
 
             ez.logger.debug(f"opening RFCOMM connection on {self.STATE.device_settings.address}")
 
-            try:
-                # We choose to do this instead of using pybluez so that we can interact
-                # with RFCOMM using non-blocking async calls.  Currently, this is only
-                # supported on linux with python built with bluetooth support.
-                # NOTE: sock.connect is blocking and could take a long time to return...
-                #     - this unit should probably live in its own process because of this...
-                sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM) # type: ignore
-                sock.connect((self.STATE.device_settings.address, _UNICORN_PORT))
-                reader, writer = await asyncio.open_connection(sock = sock)
-            except Exception as e:
-                ez.logger.warning(f'could not open RFCOMM connection to {self.STATE.device_settings.address}: {e}')
-                continue
+            while True:
+                try:
+                    # We choose to do this instead of using pybluez so that we can interact
+                    # with RFCOMM using non-blocking async calls.  Currently, this is only
+                    # supported on linux with python built with bluetooth support.
+                    # NOTE: sock.connect is blocking and could take a long time to return...
+                    #     - this unit should probably live in its own process because of this...
+                    sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM) # type: ignore
+                    sock.connect((self.STATE.device_settings.address, _UNICORN_PORT))
+                    reader, writer = await asyncio.open_connection(sock = sock)
+                except Exception as e:
+                    ez.logger.debug(f'could not open RFCOMM connection to {self.STATE.device_settings.address}: {e}')
+                    await asyncio.sleep(1.0)
+                    continue
 
-            try:
-                ez.logger.debug(f"starting stream")
-                writer.write(b'\x61\x7C\x87') # Start Acquisition
-                await writer.drain()
-            
-                while True:
+                try:
+                    ez.logger.debug(f"starting stream")
+                    writer.write(b'\x61\x7C\x87') # Start Acquisition
+                    await writer.drain()
+                
+                    while True:
 
-                    if self.STATE.disconnect_event.is_set():
-                        break
-                    
-                    block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
-
-                    battery_level = 0
-                    bounds = np.arange(self.STATE.device_settings.n_samp + 1) * _UNICORN_PAYLOAD_LENGTH
-                    eeg_frames, accel_frames, gyro_frames = [], [], []
-
-                    for start, stop in zip(bounds[:-1], bounds[1:]):
-                        payload = block[int(start):int(stop)]
+                        if self.STATE.disconnect_event.is_set():
+                            break
                         
-                        eeg_frames.append(np.array([
-                            int.from_bytes(
-                                payload[
-                                    _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
-                                    _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
-                                ],
-                                byteorder='big',
-                                signed=True
-                            ) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
-                        ]))
+                        block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
 
-                        # Extract accelerometer data
-                        accel_frames.append(np.array([
-                            int.from_bytes(
-                                payload[
-                                    _UNICORN_ACC_OFFSET + i * _UNICORN_BYTES_PER_ACC_CHANNEL :
-                                    _UNICORN_ACC_OFFSET + (i + 1) * _UNICORN_BYTES_PER_ACC_CHANNEL
-                                ],
-                                byteorder='big',
-                                signed=True
-                            ) for i in range(_UNICORN_ACC_CHANNELS_COUNT)
-                        ]))
+                        battery_level = 0
+                        bounds = np.arange(self.STATE.device_settings.n_samp + 1) * _UNICORN_PAYLOAD_LENGTH
+                        eeg_frames, accel_frames, gyro_frames = [], [], []
 
-                        # Extract gyroscope data
-                        gyro_frames.append(np.array([
-                            int.from_bytes(
-                                payload[
-                                    _UNICORN_GYR_OFFSET + i * _UNICORN_BYTES_PER_GYR_CHANNEL :
-                                    _UNICORN_GYR_OFFSET + (i + 1) * _UNICORN_BYTES_PER_GYR_CHANNEL
-                                ],
-                                byteorder='big',
-                                signed=True
-                            ) for i in range(_UNICORN_GYROSCOPE_CHANNELS_COUNT)
-                        ]))
+                        for start, stop in zip(bounds[:-1], bounds[1:]):
+                            payload = block[int(start):int(stop)]
+                            
+                            eeg_frames.append(np.array([
+                                int.from_bytes(
+                                    payload[
+                                        _UNICORN_EEG_OFFSET +  i      * _UNICORN_BYTES_PER_EEG_CHANNEL :
+                                        _UNICORN_EEG_OFFSET + (i + 1) * _UNICORN_BYTES_PER_EEG_CHANNEL
+                                    ],
+                                    byteorder='big',
+                                    signed=True
+                                ) for i in range(_UNICORN_EEG_CHANNELS_COUNT)
+                            ]))
 
-                        battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
+                            # Extract accelerometer data
+                            accel_frames.append(np.array([
+                                int.from_bytes(
+                                    payload[
+                                        _UNICORN_ACC_OFFSET + i * _UNICORN_BYTES_PER_ACC_CHANNEL :
+                                        _UNICORN_ACC_OFFSET + (i + 1) * _UNICORN_BYTES_PER_ACC_CHANNEL
+                                    ],
+                                    byteorder='big',
+                                    signed=True
+                                ) for i in range(_UNICORN_ACC_CHANNELS_COUNT)
+                            ]))
 
-                    samp_idx = int.from_bytes(block[39:43], byteorder = 'little', signed = False)
-                    time = samp_idx / _UNICORN_FS
+                            # Extract gyroscope data
+                            gyro_frames.append(np.array([
+                                int.from_bytes(
+                                    payload[
+                                        _UNICORN_GYR_OFFSET + i * _UNICORN_BYTES_PER_GYR_CHANNEL :
+                                        _UNICORN_GYR_OFFSET + (i + 1) * _UNICORN_BYTES_PER_GYR_CHANNEL
+                                    ],
+                                    byteorder='big',
+                                    signed=True
+                                ) for i in range(_UNICORN_GYROSCOPE_CHANNELS_COUNT)
+                            ]))
 
-                    time_axis = AxisArray.Axis.TimeAxis(
-                        fs = _UNICORN_FS,
-                        offset = time
-                    )
-                        
-                    eeg_message = AxisArray(
-                        data = _CALIBRATE_EEG(np.array(eeg_frames)),
-                        dims = ['time', 'ch'],
-                        axes = {'time': time_axis}
-                    )
+                            battery_level = (100.0 / 1.3) * ((payload[_UNICORN_BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
 
-                    acc_message = AxisArray(
-                        data = _CALIBRATE_ACC(np.array(accel_frames)),
-                        dims = ['time', 'ch'],
-                        axes = {'time': time_axis}
-                    )
+                        samp_idx = int.from_bytes(block[39:43], byteorder = 'little', signed = False)
+                        time = samp_idx / _UNICORN_FS
 
-                    gyr_message = AxisArray(
-                        data = _CALIBRATE_GYR(np.array(gyro_frames)),
-                        dims = ['time', 'ch'],
-                        axes = {'time': time_axis}
-                    )
+                        time_axis = AxisArray.Axis.TimeAxis(
+                            fs = _UNICORN_FS,
+                            offset = time
+                        )
+                            
+                        eeg_message = AxisArray(
+                            data = _CALIBRATE_EEG(np.array(eeg_frames)),
+                            dims = ['time', 'ch'],
+                            axes = {'time': time_axis}
+                        )
 
-                    yield self.OUTPUT_SIGNAL, eeg_message
-                    yield self.OUTPUT_BATTERY, battery_level
-                    yield self.OUTPUT_GYROSCOPE, gyr_message
-                    yield self.OUTPUT_ACCELEROMETER, acc_message
+                        acc_message = AxisArray(
+                            data = _CALIBRATE_ACC(np.array(accel_frames)),
+                            dims = ['time', 'ch'],
+                            axes = {'time': time_axis}
+                        )
 
-  
-            finally:
-                ez.logger.debug(f"stopping stream")
-                writer.write(b"\x63\x5C\xC5") # Stop acquisition
-                await writer.drain()
-                writer.close()
-                await writer.wait_closed()
+                        gyr_message = AxisArray(
+                            data = _CALIBRATE_GYR(np.array(gyro_frames)),
+                            dims = ['time', 'ch'],
+                            axes = {'time': time_axis}
+                        )
+
+                        yield self.OUTPUT_SIGNAL, eeg_message
+                        yield self.OUTPUT_BATTERY, battery_level
+                        yield self.OUTPUT_GYROSCOPE, gyr_message
+                        yield self.OUTPUT_ACCELEROMETER, acc_message
+
+    
+                finally:
+                    ez.logger.debug(f"stopping stream")
+                    writer.write(b"\x63\x5C\xC5") # Stop acquisition
+                    await writer.drain()
+                    writer.close()
+                    await writer.wait_closed()
+
+                if self.STATE.disconnect_event.is_set():
+                    break
 
                         
 if __name__ == '__main__':
