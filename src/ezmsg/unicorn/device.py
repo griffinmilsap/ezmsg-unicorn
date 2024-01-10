@@ -124,7 +124,11 @@ class UnicornDevice(ez.Unit):
                         if self.STATE.disconnect_event.is_set():
                             break
                         
-                        block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
+                        try:
+                            block = await reader.readexactly(_UNICORN_PAYLOAD_LENGTH * self.STATE.device_settings.n_samp)
+                        except TimeoutError:
+                            ez.logger.warning('timeout on unicorn connection. disconnected.')
+                            break
 
                         battery_level = 0
                         bounds = np.arange(self.STATE.device_settings.n_samp + 1) * _UNICORN_PAYLOAD_LENGTH
@@ -203,11 +207,12 @@ class UnicornDevice(ez.Unit):
 
     
                 finally:
-                    ez.logger.debug(f"stopping stream")
-                    writer.write(b"\x63\x5C\xC5") # Stop acquisition
-                    await writer.drain()
-                    writer.close()
-                    await writer.wait_closed()
+                    if not writer.is_closing():
+                        ez.logger.debug(f"stopping stream")
+                        writer.write(b"\x63\x5C\xC5") # Stop acquisition
+                        await writer.drain()
+                        writer.close()
+                        await writer.wait_closed()
 
                 if self.STATE.disconnect_event.is_set():
                     break
