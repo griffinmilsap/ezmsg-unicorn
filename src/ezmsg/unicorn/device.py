@@ -111,7 +111,7 @@ class UnicornDevice(ez.Unit):
                     reader, writer = await asyncio.open_connection(sock = sock)
                 except Exception as e:
                     ez.logger.debug(f'could not open RFCOMM connection to {self.STATE.device_settings.address}: {e}')
-                    await asyncio.sleep(1.0)
+                    await asyncio.sleep(60.0)
                     continue
 
                 try:
