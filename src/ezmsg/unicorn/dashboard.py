@@ -9,10 +9,9 @@ import panel as pn
 
 from param.parameterized import Event
 from ezmsg.util.messages.axisarray import AxisArray
-from ezmsg.unicorn.device import UnicornDevice, UnicornDeviceSettings, _UNICORN_FS, _UNICORN_EEG_CHANNELS_COUNT
-from ezmsg.sigproc.synth import EEGSynth, EEGSynthSettings
+from ezmsg.unicorn.device import Unicorn, UnicornSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
-from ezmsg.panel.tabbedapp import Tab, TabbedApp
+from ezmsg.panel.tabbedapp import Tab
 
 
 class UnicornDiscoveryState(ez.State):
@@ -24,21 +23,21 @@ class UnicornDiscoveryState(ez.State):
     connect_button: pn.widgets.Button
     disconnect_button: pn.widgets.Button
 
-    settings_queue: asyncio.Queue[UnicornDeviceSettings]
+    settings_queue: asyncio.Queue[UnicornSettings]
 
     options: typing.List[str] = field(default_factory=list)
     addresses: typing.Dict[str, str] = field(default_factory = dict)
 
 
 class UnicornDiscoverySettings(ez.Settings):
-    default_settings: UnicornDeviceSettings
+    default_settings: UnicornSettings
 
 
 class UnicornDiscovery(ez.Unit):
     SETTINGS: UnicornDiscoverySettings
     STATE: UnicornDiscoveryState
 
-    OUTPUT_SETTINGS = ez.OutputStream(UnicornDeviceSettings)
+    OUTPUT_SETTINGS = ez.OutputStream(UnicornSettings)
 
     def initialize(self) -> None:
         
@@ -64,7 +63,7 @@ class UnicornDiscovery(ez.Unit):
         )
 
         async def scan(value: Event):
-            scan_time = 5.0 # sec
+            scan_time = 30.0 # sec
             poll_time = 0.2 # sec
 
             self.STATE.scan_button.disabled = True
@@ -147,10 +146,10 @@ class UnicornDiscovery(ez.Unit):
                 if 'NEW' in tag and ty == 'Device':
                     addr = tokens[3]
                     name = ' '.join(tokens[4:])
-                    # if 'UN-' in name:
-                    entry = f'{name} ({addr})'
-                    self.STATE.addresses[entry] = addr
-                    self.STATE.device_select.options = list(self.STATE.addresses.keys())
+                    if 'UN-' in name:
+                        entry = f'{name} ({addr})'
+                        self.STATE.addresses[entry] = addr
+                        self.STATE.device_select.options = list(self.STATE.addresses.keys())
 
             exit_code = await process.wait()
 
@@ -174,13 +173,13 @@ class UnicornSimulatorSwitch(ez.Unit):
 
     STATE: UnicornSimulatorSwitchState
 
-    INPUT_SETTINGS = ez.InputStream(UnicornDeviceSettings)
+    INPUT_SETTINGS = ez.InputStream(UnicornSettings)
     INPUT_SYNTH_SIGNAL = ez.InputStream(AxisArray)
     INPUT_DEVICE_SIGNAL = ez.InputStream(AxisArray)
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
 
     @ez.subscriber(INPUT_SETTINGS)
-    async def on_settings(self, msg: UnicornDeviceSettings) -> None:
+    async def on_settings(self, msg: UnicornSettings) -> None:
         self.STATE.output_simulator = msg.address == 'simulator'
 
     @ez.subscriber(INPUT_DEVICE_SIGNAL)
@@ -201,8 +200,8 @@ class UnicornSimulatorSwitch(ez.Unit):
 
 
 class UnicornDashboardSettings(ez.Settings):
-    device_settings: UnicornDeviceSettings = field(
-        default_factory = UnicornDeviceSettings
+    device_settings: UnicornSettings = field(
+        default_factory = UnicornSettings
     )
 
 
@@ -213,14 +212,12 @@ class UnicornDashboard(ez.Collection, Tab):
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
     OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
     OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
+    OUTPUT_BATTERY = ez.OutputStream(float)
 
     PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = ''))
 
-    SIMSWITCH = UnicornSimulatorSwitch()
-    SYNTH = EEGSynth()
-
     DISCOVERY = UnicornDiscovery()
-    DEVICE = UnicornDevice()
+    DEVICE = Unicorn()
 
     def configure(self) -> None:
         self.DEVICE.apply_settings(self.SETTINGS.device_settings)
@@ -230,16 +227,8 @@ class UnicornDashboard(ez.Collection, Tab):
             )
         )
 
-        self.SYNTH.apply_settings(
-            EEGSynthSettings(
-                fs = _UNICORN_FS, 
-                n_ch= _UNICORN_EEG_CHANNELS_COUNT, 
-                n_time = self.SETTINGS.device_settings.n_samp
-            )
-        )
-
     @property
-    def tab_name(self) -> str:
+    def title(self) -> str:
         return 'Unicorn Device'
     
     def sidebar(self) -> pn.viewable.Viewable:
@@ -251,56 +240,19 @@ class UnicornDashboard(ez.Collection, Tab):
     def content(self) -> pn.viewable.Viewable:
         return self.PLOT.content()
 
-    def panel(self) -> pn.viewable.Viewable:
-        return pn.Row(
-            self.sidebar(),
-            self.content(),
-        )
-
     def network(self) -> ez.NetworkDefinition:
         return (
             (self.DISCOVERY.OUTPUT_SETTINGS, self.DEVICE.INPUT_SETTINGS),
-            (self.DISCOVERY.OUTPUT_SETTINGS, self.SIMSWITCH.INPUT_SETTINGS),
-            (self.SYNTH.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_SYNTH_SIGNAL),
-            (self.DEVICE.OUTPUT_SIGNAL, self.SIMSWITCH.INPUT_DEVICE_SIGNAL),
-            (self.SIMSWITCH.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
-            (self.SIMSWITCH.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
+            (self.DEVICE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
+            (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
             (self.DEVICE.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
             (self.DEVICE.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
+            (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
         )
     
     def process_components(self) -> typing.Collection[Component]:
-        return (self.DEVICE, self.SYNTH)
+        return (self.DEVICE,)
 
-
-class UnicornDashboardApp(ez.Collection, TabbedApp):
-    SETTINGS: UnicornDashboardSettings
-
-    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
-    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
-    OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
-
-    DASHBOARD = UnicornDashboard()
-
-    @property
-    def title(self) -> str:
-        return 'Unicorn Dashboard'
-
-    def configure(self) -> None:
-        self.DASHBOARD.apply_settings(self.SETTINGS)
-
-    @property
-    def tabs(self) -> typing.List[Tab]:
-        return [
-            self.DASHBOARD,
-        ]
-    
-    def network(self) -> ez.NetworkDefinition:
-        return (
-            (self.DASHBOARD.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
-            (self.DASHBOARD.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
-            (self.DASHBOARD.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
-        )
 
 if __name__ == '__main__':
     import argparse
@@ -344,18 +296,18 @@ if __name__ == '__main__':
     args = parser.parse_args(namespace = Args)
 
     APP = Application(ApplicationSettings(port = args.port))
-    DASHBOARD_APP = UnicornDashboardApp(
+    DASHBOARD = UnicornDashboard(
         UnicornDashboardSettings(
-            device_settings = UnicornDeviceSettings(
+            device_settings = UnicornSettings(
                 address = args.address,
                 n_samp = args.n_samp
             )
         )
     )
 
-    APP.panels = { 'unicorn_device': DASHBOARD_APP.app }
+    APP.panels = { 'unicorn_device': DASHBOARD.app }
 
     ez.run(
         app = APP,
-        dashboard = DASHBOARD_APP,
+        dashboard = DASHBOARD,
     )
