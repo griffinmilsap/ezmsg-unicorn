@@ -4,14 +4,31 @@ import socket
 
 import ezmsg.core as ez
 
-from .connection import UnicornConnectionSettings
+from .connection import UnicornConnection, UnicornConnectionSettings
 from .native import NativeUnicornConnection
 
-Unicorn = NativeUnicornConnection
-if not hasattr(socket, 'AF_BLUETOOTH'):
-    from .qt import QtUnicornConnection
-    Unicorn = QtUnicornConnection
+# Python libraries that handle Bluetooth Classic RFCOMM connections
+# are in short supply these days (2024)..  
+# Bleak is great and modern but only handles bluetooth low-energy (BLE)
+# PyBluez is not maintained and wheels are not compiled for modern MacOS (ARM)
+# Python has native RFCOMM support, but the Python that ships with MacOS and Windows
+# is not currently compiled with bluetooth support...
+# I hate to depend on a library as large as Qt for one silly module to handle
+# RFCOMM bluetooth communication, but this is where we are with such a dated technology.
+# @gtec - If you're reading this, please consider a BLE firmware upgrade
+
+Unicorn = UnicornConnection # Only Simulator
 UnicornSettings = UnicornConnectionSettings
+
+if hasattr(socket, 'AF_BLUETOOTH'):
+    Unicorn = NativeUnicornConnection
+else:
+    ez.logger.info(f'ezmsg-unicorn: Python was built without native RFCOMM support')
+    try:
+        from .qt import QtUnicornConnection
+        Unicorn = QtUnicornConnection
+    except ImportError:
+        ez.logger.error(f'ezmsg-unicorn: Install PyQt5 for third-party RFCOMM support')
                         
 if __name__ == '__main__':
 

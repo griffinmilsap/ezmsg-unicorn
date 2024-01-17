@@ -1,5 +1,6 @@
 import asyncio
 import typing
+import time
 
 import ezmsg.core as ez
 import numpy as np
@@ -16,7 +17,9 @@ class UnicornConnectionSettings(ez.Settings):
 
 class UnicornConnectionState(ez.State):
     cur_settings: UnicornConnectionSettings
-    incoming: asyncio.Queue[typing.Optional[bytes]]
+    incoming: asyncio.Queue[bytes]
+    simulator_task: typing.Optional[asyncio.Task]
+    reconnect_event: asyncio.Event()
 
 class UnicornConnection(ez.Unit):
     SETTINGS: UnicornConnectionSettings
@@ -38,11 +41,32 @@ class UnicornConnection(ez.Unit):
     # disconnect from current device and attempt to connect to the new device
     async def reconnect(self, settings: UnicornConnectionSettings) -> None:
         self.STATE.cur_settings = settings
+        self.STATE.reconnect_event.set()
+
+        if self.STATE.simulator_task is not None:
+            self.STATE.simulator_task.cancel()
+            try:
+                await self.STATE.simulator_task
+            except asyncio.CancelledError:
+                pass
+            self.STATE.simulator_task = None
+
+        if self.STATE.cur_settings.address == 'simulator':
+            self.STATE.simulator_task = asyncio.create_task(self.simulator())
 
     async def initialize(self) -> None:
         self.STATE.incoming = asyncio.Queue()
+        self.STATE.reconnect_event = asyncio.Event()
+        self.STATE.simulator_task = None
         await self.reconnect(self.SETTINGS)
 
+    async def simulator(self) -> None:
+        sleep_t = UnicornProtocol.FS / self.STATE.cur_settings.n_samp
+        while True:
+            data = None # TODO: Simulate
+            self.STATE.incoming.put_nowait(data)
+            await asyncio.sleep(sleep_t)
+        
     @ez.publisher(OUTPUT_GYROSCOPE)
     @ez.publisher(OUTPUT_SIGNAL)
     @ez.publisher(OUTPUT_BATTERY)
@@ -51,10 +75,6 @@ class UnicornConnection(ez.Unit):
 
         while True:
             block = await self.STATE.incoming.get()
-            
-            if block is None:
-                # SIMULATE A BLOCK
-                raise NotImplementedError
 
             n_samp = len(block) / UnicornProtocol.PAYLOAD_LENGTH
 

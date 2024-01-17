@@ -5,22 +5,8 @@ import time
 
 import ezmsg.core as ez
 
-
-try:
-    # Python libraries that handle Bluetooth Classic RFCOMM connections
-    # are in short supply these days (2024)..  
-    # Bleak is great and modern but only handles bluetooth low-energy (BLE)
-    # PyBluez is not maintained and wheels are not compiled for modern MacOS (ARM)
-    # Python has native RFCOMM support, but the Python that ships with MacOS and Windows
-    # is not currently compiled with bluetooth support...
-    # I hate to depend on a library as large as Qt for one silly module to handle
-    # RFCOMM bluetooth communication, but this is where we are with such a dated technology.
-    # @gtec - If you're reading this, please consider a BLE firmware upgrade
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5 import QtBluetooth
-except ImportError:
-    ez.logger.error(f'Install PyQt5 for Unicorn communications')
-    raise
+from PyQt5.QtWidgets import QApplication
+from PyQt5 import QtBluetooth
 
 from .protocol import UnicornProtocol
 
@@ -43,7 +29,7 @@ class QtUnicornConnection(UnicornConnection):
         await super().initialize()
 
     @ez.main
-    def main_thread(self) -> None:
+    def handle_device(self) -> None:
         # QApplications need to be handled from the main thread.
         # and PyQt predates asyncio so .. this is where we ended up.
 
@@ -53,41 +39,88 @@ class QtUnicornConnection(UnicornConnection):
 
         app = QApplication([])
 
-        read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
+        # NOTE: There appear to be some race conditions in this code
+        # that affect reconnecting and disconnecting.  I don't like it either
+        # but I'm out of time to debug this functionality. -Griff
 
-        sock = QtBluetooth.QBluetoothSocket(
-            QtBluetooth.QBluetoothServiceInfo.RfcommProtocol # type: ignore
-        )
+        while True: # Application Loop
 
-        def socket_error(_) -> None:
-            ez.logger.warning(sock.errorString())
+            while True: # pain
+                app.processEvents()
+                time.sleep(0.01)
 
-        def disconnected() -> None:
-            ez.logger.info('timeout on unicorn connection. disconnected.')
+                # Maybe needs to be threadsafe
+                if self.STATE.reconnect_event.is_set():
+                    break
 
-        def connected() -> None:
-            sock.write(UnicornProtocol.START_MSG)
+            self.STATE.loop.call_soon_threadsafe(
+                self.STATE.reconnect_event.clear
+            )
 
-        def received():
-            while sock.bytesAvailable() >= read_length:
-                block = sock.read(read_length)
-                assert len(block) == read_length
-                self.STATE.loop.call_soon_threadsafe(
-                    self.STATE.incoming.put_nowait, block
+            if self.STATE.cur_settings.address in (None, '', 'simulator'):
+                continue
+
+            ez.logger.info( 'Connecting to device!' )
+
+            while True: # Reconnection Loop; keep trying to connect if device disconnects
+
+                sock = QtBluetooth.QBluetoothSocket(
+                    QtBluetooth.QBluetoothServiceInfo.RfcommProtocol # type: ignore
                 )
 
-        sock.error.connect(socket_error)
-        sock.connected.connect(connected)
-        sock.readyRead.connect(received)
-        sock.disconnected.connect(disconnected)
+                try:
 
-        sock.connectToService(
-            QtBluetooth.QBluetoothAddress(
-                self.STATE.cur_settings.address
-            ), 
-            UnicornProtocol.PORT
-        )
+                    read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
 
-        while True:
-            app.processEvents()
-            time.sleep(0.01)
+                    def socket_error(_) -> None:
+                        ez.logger.warning(sock.errorString())
+
+                    def disconnected() -> None:
+                        ez.logger.info('timeout on unicorn connection. disconnected.')
+
+                    def connected() -> None:
+                        ez.logger.debug(f"starting stream")
+                        sock.write(UnicornProtocol.START_MSG)
+
+                    def received():
+                        while sock.isReadable() and sock.bytesAvailable() >= read_length:
+                            block = sock.read(read_length)
+                            if block:
+                                assert len(block) == read_length
+                                self.STATE.loop.call_soon_threadsafe(
+                                    self.STATE.incoming.put_nowait, block
+                                )
+
+                    sock.error.connect(socket_error)
+                    sock.connected.connect(connected)
+                    sock.readyRead.connect(received)
+                    sock.disconnected.connect(disconnected)
+
+                    sock.connectToService(
+                        QtBluetooth.QBluetoothAddress(
+                            self.STATE.cur_settings.address
+                        ), 
+                        UnicornProtocol.PORT
+                    )
+
+                    while True:
+                        app.processEvents()
+                        time.sleep(0.01)
+                        if not sock.state() or self.STATE.reconnect_event.is_set():
+                            break
+
+                finally:
+                    # As written, this tends to try to write 
+                    # after the socket is closed... which causes Qt to crash
+                    # Writing occurs once processEvents is called, but I think
+                    # sock.close occurs immediately.
+                    # Fortunately, the Unicorn seems to gracefully revert to
+                    # idle state once the socket closes without needing to 
+                    # actually send the stop message
+                    # if sock.isWritable():
+                    #     ez.logger.info(f"stopping stream")
+                    #     sock.write(UnicornProtocol.STOP_MSG)
+                    sock.close()
+
+                if self.STATE.reconnect_event.is_set():
+                    break # Out of reconnection loop
