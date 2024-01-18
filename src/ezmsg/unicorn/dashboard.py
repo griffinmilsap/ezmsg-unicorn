@@ -215,8 +215,8 @@ class UnicornDashboard(ez.Collection, Tab):
             (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
         )
     
-    def process_components(self) -> typing.Collection[Component]:
-        return (self.DEVICE,)
+    # def process_components(self) -> typing.Collection[Component]:
+    #     return (self.DEVICE,)
 
 
 if __name__ == '__main__':

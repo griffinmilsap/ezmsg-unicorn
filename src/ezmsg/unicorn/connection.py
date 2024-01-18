@@ -64,7 +64,7 @@ class UnicornConnection(ez.Unit):
         sleep_t = UnicornProtocol.FS / self.STATE.cur_settings.n_samp
         while True:
             data = None # TODO: Simulate
-            self.STATE.incoming.put_nowait(data)
+            # self.STATE.incoming.put_nowait(data)
             await asyncio.sleep(sleep_t)
         
     @ez.publisher(OUTPUT_GYROSCOPE)
