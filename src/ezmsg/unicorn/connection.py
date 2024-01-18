@@ -123,11 +123,11 @@ class UnicornConnection(ez.Unit):
                 battery_level = (100.0 / 1.3) * ((payload[UnicornProtocol.BATTERY_LEVEL_OFFSET] & 0x0F) * 1.3 / 15.0)
 
             samp_idx = int.from_bytes(block[39:43], byteorder = 'little', signed = False)
-            time = samp_idx / UnicornProtocol.FS
+            # TODO: Check for dropped packets?
 
             time_axis = AxisArray.Axis.TimeAxis(
                 fs = UnicornProtocol.FS,
-                offset = time
+                offset = time.time()
             )
                 
             eeg_message = AxisArray(

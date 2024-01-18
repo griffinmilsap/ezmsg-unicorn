@@ -23,7 +23,7 @@ UnicornSettings = UnicornConnectionSettings
 if hasattr(socket, 'AF_BLUETOOTH'):
     Unicorn = NativeUnicornConnection
 else:
-    ez.logger.info(f'ezmsg-unicorn: Python was built without native RFCOMM support')
+    ez.logger.debug(f'ezmsg-unicorn: Python was built without native RFCOMM support')
     try:
         from .qt import QtUnicornConnection
         Unicorn = QtUnicornConnection
