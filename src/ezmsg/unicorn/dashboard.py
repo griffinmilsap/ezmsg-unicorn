@@ -164,41 +164,6 @@ class UnicornDiscovery(ez.Unit):
             await process.wait()
 
 
-class UnicornSimulatorSwitchState(ez.State):
-    signal_queue: asyncio.Queue[AxisArray] = field(default_factory=asyncio.Queue)
-    output_simulator: bool = False
-
-
-class UnicornSimulatorSwitch(ez.Unit):
-
-    STATE: UnicornSimulatorSwitchState
-
-    INPUT_SETTINGS = ez.InputStream(UnicornSettings)
-    INPUT_SYNTH_SIGNAL = ez.InputStream(AxisArray)
-    INPUT_DEVICE_SIGNAL = ez.InputStream(AxisArray)
-    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
-
-    @ez.subscriber(INPUT_SETTINGS)
-    async def on_settings(self, msg: UnicornSettings) -> None:
-        self.STATE.output_simulator = msg.address == 'simulator'
-
-    @ez.subscriber(INPUT_DEVICE_SIGNAL)
-    async def on_device_signal(self, msg: AxisArray) -> None:
-        if not self.STATE.output_simulator:
-            self.STATE.signal_queue.put_nowait(msg)
-
-    @ez.subscriber(INPUT_SYNTH_SIGNAL)
-    async def on_synth_signal(self, msg: AxisArray) -> None:
-        if self.STATE.output_simulator:
-            self.STATE.signal_queue.put_nowait(msg)
-
-    @ez.publisher(OUTPUT_SIGNAL)
-    async def pub_signal(self) -> typing.AsyncGenerator:
-        while True:
-            signal = await self.STATE.signal_queue.get()
-            yield self.OUTPUT_SIGNAL, signal
-
-
 class UnicornDashboardSettings(ez.Settings):
     device_settings: UnicornSettings = field(
         default_factory = UnicornSettings
