@@ -127,7 +127,7 @@ class UnicornConnection(ez.Unit):
 
             time_axis = AxisArray.Axis.TimeAxis(
                 fs = UnicornProtocol.FS,
-                offset = time.time()
+                offset = time.time() - (n_samp / UnicornProtocol.FS)
             )
                 
             eeg_message = AxisArray(
