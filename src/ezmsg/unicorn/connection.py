@@ -19,7 +19,7 @@ class UnicornConnectionState(ez.State):
     cur_settings: UnicornConnectionSettings
     incoming: asyncio.Queue[bytes]
     simulator_task: typing.Optional[asyncio.Task]
-    reconnect_event: asyncio.Event()
+    reconnect_event: asyncio.Event
 
 class UnicornConnection(ez.Unit):
     SETTINGS: UnicornConnectionSettings
