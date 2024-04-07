@@ -4,7 +4,6 @@ import typing
 from dataclasses import field, replace
 
 import ezmsg.core as ez
-from ezmsg.core.component import Component
 import panel as pn
 
 from param.parameterized import Event
@@ -12,6 +11,7 @@ from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.unicorn.device import Unicorn, UnicornSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 from ezmsg.panel.tabbedapp import Tab
+from ezmsg.sigproc.window import Window, WindowSettings
 
 
 class UnicornDiscoveryState(ez.State):
@@ -168,6 +168,7 @@ class UnicornDashboardSettings(ez.Settings):
     device_settings: UnicornSettings = field(
         default_factory = UnicornSettings
     )
+    plot_update_rate: float = 5.0 # Hz
 
 
 class UnicornDashboard(ez.Collection, Tab):
@@ -183,12 +184,22 @@ class UnicornDashboard(ez.Collection, Tab):
 
     DISCOVERY = UnicornDiscovery()
     DEVICE = Unicorn()
+    PLOT_WINDOW = Window()
 
     def configure(self) -> None:
         self.DEVICE.apply_settings(self.SETTINGS.device_settings)
         self.DISCOVERY.apply_settings(
             UnicornDiscoverySettings(
                 default_settings = self.SETTINGS.device_settings
+            )
+        )
+
+        plot_per = 1.0 / self.SETTINGS.plot_update_rate
+        self.PLOT_WINDOW.apply_settings(
+                WindowSettings(
+                axis = 'time', 
+                window_dur = plot_per, 
+                window_shift = plot_per
             )
         )
 
@@ -208,15 +219,13 @@ class UnicornDashboard(ez.Collection, Tab):
     def network(self) -> ez.NetworkDefinition:
         return (
             (self.DISCOVERY.OUTPUT_SETTINGS, self.DEVICE.INPUT_SETTINGS),
-            (self.DEVICE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
+            (self.DEVICE.OUTPUT_SIGNAL, self.PLOT_WINDOW.INPUT_SIGNAL),
+            (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
             (self.DEVICE.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
             (self.DEVICE.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
             (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
         )
-    
-    # def process_components(self) -> typing.Collection[Component]:
-    #     return (self.DEVICE,)
 
 
 if __name__ == '__main__':
