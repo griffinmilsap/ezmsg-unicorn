@@ -76,11 +76,13 @@ class QtUnicornConnection(UnicornConnection):
                         ez.logger.warning(sock.errorString())
 
                     def disconnected() -> None:
+                        # FIXME: Gracefully disconnect
                         ez.logger.info('timeout on unicorn connection. disconnected.')
 
                     def connected() -> None:
                         ez.logger.debug(f"starting stream")
                         sock.write(UnicornProtocol.START_MSG)
+                        reply = sock.read(len(UnicornProtocol.START_MSG)) # 0x00, 0x00, 0x00
 
                     def received():
                         while sock.isReadable() and sock.bytesAvailable() >= read_length:

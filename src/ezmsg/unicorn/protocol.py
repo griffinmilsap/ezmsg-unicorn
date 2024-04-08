@@ -78,10 +78,10 @@ class UnicornProtocol:
         If adc_units == True, returns raw ADC data, otherwise returns data in (g, deg/sec) respectively
         """
         n_ch = UnicornProtocol.ACC_CHANNELS_COUNT + UnicornProtocol.GYR_CHANNELS_COUNT
-        acc_bytes = self.data_bytes[:, UnicornProtocol.ACC_OFFSET:UnicornProtocol.COUNT_OFFSET]
-        acc_gyr_data = np.frombuffer(acc_bytes.copy().data, dtype = np.int16).reshape(self.n_samp, n_ch) 
-        acc = acc_gyr_data[:, :UnicornProtocol.ACC_CHANNELS_COUNT]
-        gyr = acc_gyr_data[:, UnicornProtocol.ACC_CHANNELS_COUNT:]
+        motion_bytes = self.data_bytes[:, UnicornProtocol.ACC_OFFSET:UnicornProtocol.COUNT_OFFSET]
+        motion_data = np.frombuffer(motion_bytes.copy().data, dtype = np.int16).reshape(self.n_samp, n_ch) 
+        acc = motion_data[:, :UnicornProtocol.ACC_CHANNELS_COUNT]
+        gyr = motion_data[:, UnicornProtocol.ACC_CHANNELS_COUNT:]
         return (
             acc if adc_units else acc * UnicornProtocol.ACC_SCALE,
             gyr if adc_units else gyr * UnicornProtocol.GYR_SCALE
