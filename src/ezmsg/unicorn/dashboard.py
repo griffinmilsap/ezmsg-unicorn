@@ -249,7 +249,7 @@ if __name__ == '__main__':
     device_group = parser.add_argument_group('device')
 
     device_group.add_argument(
-        '--address',
+        '--address', '-a',
         type = str,
         help = 'bluetooth address of Unicorn to autoconnect to (XX:XX:XX:XX:XX:XX)',
         default = None
