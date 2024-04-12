@@ -12,6 +12,7 @@ from ezmsg.unicorn.device import Unicorn, UnicornSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 from ezmsg.panel.tabbedapp import Tab
 from ezmsg.sigproc.window import Window, WindowSettings
+from ezmsg.sigproc.decimate import Decimate, DownsampleSettings
 
 
 class UnicornDiscoveryState(ez.State):
@@ -184,6 +185,7 @@ class UnicornDashboard(ez.Collection, Tab):
 
     DISCOVERY = UnicornDiscovery()
     DEVICE = Unicorn()
+    PLOT_DECIMATE = Decimate(DownsampleSettings(axis = 'time', factor = 2))
     PLOT_WINDOW = Window()
 
     def configure(self) -> None:
@@ -220,12 +222,16 @@ class UnicornDashboard(ez.Collection, Tab):
         return (
             (self.DISCOVERY.OUTPUT_SETTINGS, self.DEVICE.INPUT_SETTINGS),
             (self.DEVICE.OUTPUT_SIGNAL, self.PLOT_WINDOW.INPUT_SIGNAL),
-            (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
+            (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT_DECIMATE.INPUT_SIGNAL),
+            (self.PLOT_DECIMATE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
             (self.DEVICE.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
             (self.DEVICE.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
             (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
         )
+    
+    def process_components(self) -> typing.Collection[ez.Component]:
+        return (self.DEVICE, )
 
 
 if __name__ == '__main__':
