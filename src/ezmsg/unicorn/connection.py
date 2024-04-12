@@ -20,6 +20,7 @@ class UnicornConnectionState(ez.State):
     incoming: asyncio.Queue[bytes]
     simulator_task: typing.Optional[asyncio.Task]
     reconnect_event: asyncio.Event
+    last_count: typing.Optional[int] = None
 
 class UnicornConnection(ez.Unit):
     SETTINGS: UnicornConnectionSettings
@@ -58,6 +59,7 @@ class UnicornConnection(ez.Unit):
         self.STATE.incoming = asyncio.Queue()
         self.STATE.reconnect_event = asyncio.Event()
         self.STATE.simulator_task = None
+        self.STATE.last_count = None
         await self.reconnect(self.SETTINGS)
 
     async def simulator(self) -> None:
@@ -75,6 +77,15 @@ class UnicornConnection(ez.Unit):
 
         while True:
             decoder = UnicornProtocol(await self.STATE.incoming.get())
+
+            count = decoder.packet_count()
+            if self.STATE.last_count is None:
+                self.STATE.last_count = count[0].item() - 1
+            dropped_frames = np.diff(count, prepend = self.STATE.last_count).sum() - len(count)
+            self.STATE.last_count = count[-1]
+            if dropped_frames:
+                ez.logger.info(f'{dropped_frames=}')
+
 
             time_axis = AxisArray.Axis.TimeAxis(
                 fs = UnicornProtocol.FS,
