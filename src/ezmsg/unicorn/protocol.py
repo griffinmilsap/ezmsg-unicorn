@@ -48,6 +48,8 @@ class UnicornProtocol:
     ACC_SCALE = (1.0 / 4096.0) # g / ADC Units
     GYR_SCALE = (1.0 / 32.8) # deg/sec / ADC Units
 
+    MOTION_SCALE = np.array([ACC_SCALE] * ACC_CHANNELS_COUNT + [GYR_SCALE] * GYR_CHANNELS_COUNT)
+
     n_samp: int
     data_bytes: npt.NDArray
 
@@ -70,7 +72,7 @@ class UnicornProtocol:
             .reshape(self.n_samp, UnicornProtocol.EEG_CHANNELS_COUNT)
         return eeg_data if adc_units else eeg_data * UnicornProtocol.EEG_SCALE
 
-    def motion(self, adc_units: bool = False) -> typing.Tuple[npt.NDArray, npt.NDArray]:
+    def motion(self, adc_units: bool = False) -> npt.NDArray:
         """ Decode motion data
         Returns (accelerometer (time x 3 ch), gyroscope (time x 3 ch)) decoded motion data.
         Its just much faster to decode both of these at the same time rather than split
@@ -80,12 +82,7 @@ class UnicornProtocol:
         n_ch = UnicornProtocol.ACC_CHANNELS_COUNT + UnicornProtocol.GYR_CHANNELS_COUNT
         motion_bytes = self.data_bytes[:, UnicornProtocol.ACC_OFFSET:UnicornProtocol.COUNT_OFFSET]
         motion_data = np.frombuffer(motion_bytes.copy().data, dtype = np.int16).reshape(self.n_samp, n_ch) 
-        acc = motion_data[:, :UnicornProtocol.ACC_CHANNELS_COUNT]
-        gyr = motion_data[:, UnicornProtocol.ACC_CHANNELS_COUNT:]
-        return (
-            acc if adc_units else acc * UnicornProtocol.ACC_SCALE,
-            gyr if adc_units else gyr * UnicornProtocol.GYR_SCALE
-        )
+        return motion_data if adc_units else motion_data * UnicornProtocol.MOTION_SCALE
 
     def packet_count(self) -> npt.NDArray:
         """ Decode packet count

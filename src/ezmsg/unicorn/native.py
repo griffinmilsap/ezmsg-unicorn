@@ -30,17 +30,14 @@ class NativeUnicornConnection(UnicornConnection):
                     sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, proto = socket.BTPROTO_RFCOMM) # type: ignore
                     sock.connect((self.STATE.cur_settings.address, UnicornProtocol.PORT))
                     reader, writer = await asyncio.open_connection(sock = sock)
+                    ez.logger.debug(f"RFCOMM connected")
 
                 except Exception as e:
-                    ez.logger.debug(f'could not open RFCOMM connection to {self.STATE.cur_settings.address}: {e}')
+                    ez.logger.info(f'could not open RFCOMM connection to {self.STATE.cur_settings.address}: {e}')
                     if self.STATE.reconnect_event.is_set():
                         break
+                    continue
 
-                    else:
-                        await asyncio.sleep(60.0) # TODO: Consider making this a setting.. reconnect_delay?
-                        continue
-
-                read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
 
                 try:
                     # 1. Send "Start Acquisition" command
@@ -49,8 +46,10 @@ class NativeUnicornConnection(UnicornConnection):
                     await writer.drain()
                     
                     # 2. Receive "Start Acquisition" acknowledge message
-                    response = await reader.readexactly(len(UnicornProtocol.START_MSG)) # 0x00 0x00 0x00
+                    _ = await reader.readexactly(len(UnicornProtocol.START_MSG)) # 0x00 0x00 0x00
 
+                    interpolator = self.interpolator()
+                    read_length = UnicornProtocol.PAYLOAD_LENGTH * self.SETTINGS.n_samp
                     while True: # Acquisition loop; continue to get data while connected
 
                         if self.STATE.reconnect_event.is_set():
@@ -59,7 +58,7 @@ class NativeUnicornConnection(UnicornConnection):
                         try:
                             # 3. Receive Payload
                             block = await reader.readexactly(read_length)
-                            self.STATE.incoming.put_nowait(block)
+                            interpolator.send(block)
 
                         except TimeoutError:
                             ez.logger.warning('timeout on unicorn connection. disconnected.')
@@ -74,7 +73,7 @@ class NativeUnicornConnection(UnicornConnection):
                         writer.write(UnicornProtocol.STOP_MSG)
                         await writer.drain()
                         # 7. Receive "Stop Acquisition" acknowledge message
-                        response = await reader.readexactly(len(UnicornProtocol.STOP_MSG)) # 0x00 0x00 0x00
+                        _ = await reader.readexactly(len(UnicornProtocol.STOP_MSG)) # 0x00 0x00 0x00
                         writer.close()
                         await writer.wait_closed()
 

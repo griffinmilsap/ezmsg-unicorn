@@ -71,6 +71,7 @@ class QtUnicornConnection(UnicornConnection):
                 try:
 
                     read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
+                    interpolator = self.interpolator()
 
                     def socket_error(_) -> None:
                         ez.logger.warning(sock.errorString())
@@ -90,7 +91,7 @@ class QtUnicornConnection(UnicornConnection):
                             if block:
                                 assert len(block) == read_length
                                 self.STATE.loop.call_soon_threadsafe(
-                                    self.STATE.incoming.put_nowait, block
+                                    interpolator.send, block
                                 )
 
                     sock.error.connect(socket_error)

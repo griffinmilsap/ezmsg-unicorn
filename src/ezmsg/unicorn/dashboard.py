@@ -177,8 +177,7 @@ class UnicornDashboard(ez.Collection, Tab):
     SETTINGS: UnicornDashboardSettings
 
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
-    OUTPUT_ACCELEROMETER = ez.OutputStream(AxisArray)
-    OUTPUT_GYROSCOPE = ez.OutputStream(AxisArray)
+    OUTPUT_MOTION = ez.OutputStream(AxisArray)
     OUTPUT_BATTERY = ez.OutputStream(float)
 
     PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = ''))
@@ -225,8 +224,7 @@ class UnicornDashboard(ez.Collection, Tab):
             (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT_DECIMATE.INPUT_SIGNAL),
             (self.PLOT_DECIMATE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
-            (self.DEVICE.OUTPUT_ACCELEROMETER, self.OUTPUT_ACCELEROMETER),
-            (self.DEVICE.OUTPUT_GYROSCOPE, self.OUTPUT_GYROSCOPE),
+            (self.DEVICE.OUTPUT_MOTION, self.OUTPUT_MOTION),
             (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
         )
     

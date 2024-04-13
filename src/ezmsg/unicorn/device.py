@@ -80,7 +80,6 @@ if __name__ == '__main__':
             connections=(
                 (DEVICE.OUTPUT_SIGNAL, LOG.INPUT),
                 (DEVICE.OUTPUT_BATTERY, LOG.INPUT),
-                (DEVICE.OUTPUT_GYROSCOPE, LOG.INPUT),
-                (DEVICE.OUTPUT_ACCELEROMETER, LOG.INPUT)
+                (DEVICE.OUTPUT_MOTION, LOG.INPUT),
             )
         )
