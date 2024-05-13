@@ -72,6 +72,7 @@ class QtUnicornConnection(UnicornConnection):
 
                     read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
                     interpolator = self.interpolator()
+                    start_response_received = False
 
                     def socket_error(_) -> None:
                         ez.logger.warning(sock.errorString())
@@ -83,9 +84,16 @@ class QtUnicornConnection(UnicornConnection):
                     def connected() -> None:
                         ez.logger.debug(f"starting stream")
                         sock.write(UnicornProtocol.START_MSG)
-                        reply = sock.read(len(UnicornProtocol.START_MSG)) # 0x00, 0x00, 0x00
 
                     def received():
+                        nonlocal start_response_received
+                        if not start_response_received:
+                            while sock.isReadable() and sock.bytesAvailable() >= 3:
+                                response = sock.read(3)
+                                ez.logger.info(f'Connected. {response=}')
+                                start_response_received = True
+                                return
+                            
                         while sock.isReadable() and sock.bytesAvailable() >= read_length:
                             block = sock.read(read_length)
                             if block:
