@@ -16,7 +16,9 @@ class NativeUnicornConnection(UnicornConnection):
             await self.STATE.reconnect_event.wait()
             self.STATE.reconnect_event.clear()
 
-            if self.STATE.cur_settings.address in (None, '', 'simulator'):
+            if self.STATE.cur_settings.address in (None, '') or (
+                isinstance(self.STATE.cur_settings.address, str) and 
+                'simulator' in self.STATE.cur_settings.address ):
                 continue
 
             while True: # Reconnection Loop; keep trying to connect on device disconnect

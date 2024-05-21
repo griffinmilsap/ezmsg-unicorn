@@ -57,7 +57,9 @@ class QtUnicornConnection(UnicornConnection):
                 self.STATE.reconnect_event.clear
             )
 
-            if self.STATE.cur_settings.address in (None, '', 'simulator'):
+            if self.STATE.cur_settings.address in (None, '') or (
+                isinstance(self.STATE.cur_settings.address, str) and 
+                'simulator' in self.STATE.cur_settings.address ):
                 continue
 
             ez.logger.info( 'Connecting to device!' )

@@ -2,9 +2,10 @@ import asyncio
 import typing
 import time
 
+from importlib.resources import files
+
 import ezmsg.core as ez
 import numpy as np
-import numpy.typing as npt
 
 from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.util.generator import consumer
@@ -19,7 +20,6 @@ class UnicornConnectionSettings(ez.Settings):
 
 class UnicornConnectionState(ez.State):
     cur_settings: UnicornConnectionSettings
-    simulator_task: typing.Optional[asyncio.Task]
     reconnect_event: asyncio.Event
 
     signal_queue: asyncio.Queue[AxisArray]
@@ -74,8 +74,13 @@ class UnicornConnection(ez.Unit):
                 pass
             self.STATE.simulator_task = None
 
-        if self.STATE.cur_settings.address == 'simulator':
-            self.STATE.simulator_task = asyncio.create_task(self.simulator())
+        if isinstance(self.STATE.cur_settings.address, str) and 'simulator' in self.STATE.cur_settings.address:
+            ez.logger.info(f'Starting Unicorn simulator task: {self.STATE.cur_settings.address}')
+            self.STATE.simulator_task = asyncio.create_task(
+                self.simulator(
+                    recording = self.STATE.cur_settings.address
+                )
+            )
 
     async def initialize(self) -> None:
         self.STATE.reconnect_event = asyncio.Event()
@@ -87,12 +92,45 @@ class UnicornConnection(ez.Unit):
 
         await self.reconnect(self.SETTINGS)
 
-    async def simulator(self) -> None:
-        sleep_t = UnicornProtocol.FS / self.STATE.cur_settings.n_samp
-        while True:
-            data = None # TODO: Capture some data and read it out from file on loop here
-            # self.STATE.incoming.put_nowait(data)
-            await asyncio.sleep(sleep_t) # FIXME: Account for last_publish_time
+    async def simulator(self, recording: str) -> None:
+        rec_dir = files('ezmsg.unicorn.recordings')
+        recs = [f.stem for f in rec_dir.glob('*.bin')]
+        if recording not in recs:
+            ez.logger.error(f'Could not find simulator recording: {recording}')
+            ez.logger.info(f'Availble simulators: {recs}')
+            return
+        
+        data = rec_dir.joinpath(f'{recording}.bin').read_bytes()
+        read_length = UnicornProtocol.PAYLOAD_LENGTH * self.SETTINGS.n_samp
+
+        while True: # Loop Recording
+            cur_idx: int = 0
+            last_samp: typing.Optional[int] = None
+            interpolator = self.interpolator()
+
+            while True: # Acquire Loop
+                read_stop = cur_idx + read_length
+                if read_stop >= len(data):
+                    ez.logger.info('Simulator record looping')
+                    break
+                block = data[cur_idx:read_stop]
+                cur_idx = read_stop
+
+                # Recording may have dropped packets (as a real device may)
+                # Figure out how long to sleep in the presence of these dropped packets
+                samp_indices = UnicornProtocol(block).packet_count()
+                if last_samp is None:
+                    last_samp = samp_indices[0].item() - 1
+
+                assert last_samp is not None
+                
+                cur_samp = samp_indices[-1].item()
+                delta_samp = cur_samp - last_samp
+                last_samp = cur_samp
+
+                await asyncio.sleep(delta_samp / UnicornProtocol.FS)
+                interpolator.send(block)
+
 
     @consumer
     def interpolator(self) -> typing.Generator[None, bytes, None]:
