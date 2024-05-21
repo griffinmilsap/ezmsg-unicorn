@@ -101,7 +101,7 @@ class UnicornConnection(ez.Unit):
             return
         
         data = rec_dir.joinpath(f'{recording}.bin').read_bytes()
-        read_length = UnicornProtocol.PAYLOAD_LENGTH * self.SETTINGS.n_samp
+        read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
 
         while True: # Loop Recording
             cur_idx: int = 0
