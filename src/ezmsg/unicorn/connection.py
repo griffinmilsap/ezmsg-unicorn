@@ -160,10 +160,10 @@ class UnicornConnection(ez.Unit):
                 ez.logger.info(f'Unicorn {dropped_frames=}')
                 count_buffer = np.concatenate((np.array([last_count]), count), axis = 0)
 
-                last_eeg_frame = last_eeg_frame if last_eeg_frame.size else eeg[0, ...]
+                last_eeg_frame = last_eeg_frame if last_eeg_frame.size else eeg[np.newaxis, 0, ...]
                 eeg_buffer = np.concatenate((last_eeg_frame, eeg), axis = 0)
 
-                last_motion_frame = last_motion_frame if last_motion_frame.size else motion[0, ...]
+                last_motion_frame = last_motion_frame if last_motion_frame.size else motion[np.newaxis, 0, ...]
                 motion_buffer = np.concatenate((last_motion_frame, motion), axis = 0)
 
                 interp_count = np.arange(count_buffer[0].item(), count_buffer[-1].item() + 1)
