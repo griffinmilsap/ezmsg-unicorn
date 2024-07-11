@@ -92,44 +92,57 @@ class UnicornConnection(ez.Unit):
 
         await self.reconnect(self.SETTINGS)
 
+    async def shutdown(self) -> None:
+        if self.STATE.simulator_task is not None:
+            self.STATE.simulator_task.cancel()
+            try:
+                await self.STATE.simulator_task
+            except asyncio.CancelledError:
+                pass
+            self.STATE.simulator_task = None
+
     async def simulator(self, recording: str) -> None:
         rec_dir = files('ezmsg.unicorn.recordings')
         recs = [f.stem for f in rec_dir.glob('*.bin')]
         if recording not in recs:
             ez.logger.error(f'Could not find simulator recording: {recording}')
-            ez.logger.info(f'Availble simulators: {recs}')
+            ez.logger.info(f'Available simulators: {recs}')
             return
         
         data = rec_dir.joinpath(f'{recording}.bin').read_bytes()
         read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
 
-        while True: # Loop Recording
-            cur_idx: int = 0
-            last_samp: typing.Optional[int] = None
-            interpolator = self.interpolator()
+        try:
+            while True: # Loop Recording
+                cur_idx: int = 0
+                last_samp: typing.Optional[int] = None
+                interpolator = self.interpolator()
 
-            while True: # Acquire Loop
-                read_stop = cur_idx + read_length
-                if read_stop >= len(data):
-                    ez.logger.info('Simulator record looping')
-                    break
-                block = data[cur_idx:read_stop]
-                cur_idx = read_stop
+                while True: # Acquire Loop
+                    read_stop = cur_idx + read_length
+                    if read_stop >= len(data):
+                        ez.logger.info('Simulator record looping')
+                        break
+                    block = data[cur_idx:read_stop]
+                    cur_idx = read_stop
 
-                # Recording may have dropped packets (as a real device may)
-                # Figure out how long to sleep in the presence of these dropped packets
-                samp_indices = UnicornProtocol(block).packet_count()
-                if last_samp is None:
-                    last_samp = samp_indices[0].item() - 1
+                    # Recording may have dropped packets (as a real device may)
+                    # Figure out how long to sleep in the presence of these dropped packets
+                    samp_indices = UnicornProtocol(block).packet_count()
+                    if last_samp is None:
+                        last_samp = samp_indices[0].item() - 1
 
-                assert last_samp is not None
-                
-                cur_samp = samp_indices[-1].item()
-                delta_samp = cur_samp - last_samp
-                last_samp = cur_samp
+                    assert last_samp is not None
+                    
+                    cur_samp = samp_indices[-1].item()
+                    delta_samp = cur_samp - last_samp
+                    last_samp = cur_samp
 
-                await asyncio.sleep(delta_samp / UnicornProtocol.FS)
-                interpolator.send(block)
+                    await asyncio.sleep(delta_samp / UnicornProtocol.FS)
+                    interpolator.send(block)
+        except asyncio.CancelledError:
+            pass
+
 
 
     @consumer
