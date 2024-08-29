@@ -1,4 +1,5 @@
 
+import os
 import typing
 import socket
 
@@ -15,15 +16,13 @@ from .native import NativeUnicornConnection
 # is not currently compiled with bluetooth support...
 # I hate to depend on a library as large as Qt for one silly module to handle
 # RFCOMM bluetooth communication, but this is where we are with such a dated technology.
-# @gtec - If you're reading this, please consider a BLE firmware upgrade
 
 Unicorn = UnicornConnection # Only Simulator
 UnicornSettings = UnicornConnectionSettings
 
-if hasattr(socket, 'AF_BLUETOOTH'):
+if 'EZMSG_UNICORN_QT' not in os.environ and hasattr(socket, 'AF_BLUETOOTH'):
     Unicorn = NativeUnicornConnection
 else:
-    ez.logger.debug(f'ezmsg-unicorn: Python was built without native RFCOMM support')
     try:
         from .qt import QtUnicornConnection
         Unicorn = QtUnicornConnection
