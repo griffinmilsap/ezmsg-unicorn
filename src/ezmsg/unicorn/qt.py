@@ -22,7 +22,7 @@ class QtUnicornConnectionState(UnicornConnectionState):
 
 
 class QtUnicornConnection(UnicornConnection):
-    STATE: QtUnicornConnectionState
+    STATE = QtUnicornConnectionState
 
     async def initialize(self) -> None:
         self.STATE.loop = asyncio.get_running_loop()
