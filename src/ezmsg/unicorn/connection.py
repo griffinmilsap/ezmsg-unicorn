@@ -27,8 +27,8 @@ class UnicornConnectionState(ez.State):
     battery_queue: asyncio.Queue[float]
 
 class UnicornConnection(ez.Unit):
-    SETTINGS: UnicornConnectionSettings
-    STATE: UnicornConnectionState
+    SETTINGS = UnicornConnectionSettings
+    STATE = UnicornConnectionState
 
     INPUT_SETTINGS = ez.InputStream(UnicornConnectionSettings)
     

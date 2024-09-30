@@ -35,8 +35,8 @@ class UnicornDiscoverySettings(ez.Settings):
 
 
 class UnicornDiscovery(ez.Unit):
-    SETTINGS: UnicornDiscoverySettings
-    STATE: UnicornDiscoveryState
+    SETTINGS = UnicornDiscoverySettings
+    STATE = UnicornDiscoveryState
 
     OUTPUT_SETTINGS = ez.OutputStream(UnicornSettings)
 
@@ -174,7 +174,7 @@ class UnicornDashboardSettings(ez.Settings):
 
 class UnicornDashboard(ez.Collection, Tab):
 
-    SETTINGS: UnicornDashboardSettings
+    SETTINGS = UnicornDashboardSettings
 
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
     OUTPUT_MOTION = ez.OutputStream(AxisArray)
