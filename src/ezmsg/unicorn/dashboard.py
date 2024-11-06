@@ -8,12 +8,13 @@ import panel as pn
 
 from param.parameterized import Event
 from ezmsg.util.messages.axisarray import AxisArray
-from ezmsg.unicorn.device import Unicorn, UnicornSettings
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 from ezmsg.panel.tabbedapp import Tab
 from ezmsg.sigproc.window import Window, WindowSettings
 from ezmsg.sigproc.decimate import Decimate, DownsampleSettings
 
+from .device import Unicorn, UnicornSettings
+from .orientation import Orientation, OrientationSettings
 
 class UnicornDiscoveryState(ez.State):
 
@@ -186,6 +187,7 @@ class UnicornDashboard(ez.Collection, Tab):
     DEVICE = Unicorn()
     PLOT_DECIMATE = Decimate(DownsampleSettings(axis = 'time', factor = 2))
     PLOT_WINDOW = Window()
+    ORIENTATION = Orientation()
 
     def configure(self) -> None:
         self.DEVICE.apply_settings(self.SETTINGS.device_settings)
@@ -197,10 +199,16 @@ class UnicornDashboard(ez.Collection, Tab):
 
         plot_per = 1.0 / self.SETTINGS.plot_update_rate
         self.PLOT_WINDOW.apply_settings(
-                WindowSettings(
+            WindowSettings(
                 axis = 'time', 
                 window_dur = plot_per, 
                 window_shift = plot_per
+            )
+        )
+
+        self.ORIENTATION.apply_settings(
+            OrientationSettings(
+                time_axis = 'time',
             )
         )
 
@@ -210,7 +218,17 @@ class UnicornDashboard(ez.Collection, Tab):
     
     def sidebar(self) -> pn.viewable.Viewable:
         return pn.Column(
-            self.DISCOVERY.controls(),
+            # self.DISCOVERY.controls(),
+            pn.Card(
+                pn.Row(
+                    pn.layout.HSpacer(),
+                    self.ORIENTATION.pane(),
+                    pn.layout.HSpacer(),
+                    sizing_mode = 'stretch_width'
+                ),
+                title = 'Orientation',
+                sizing_mode = 'stretch_width'
+            ),
             self.PLOT.sidebar(),
         )
     
@@ -225,14 +243,15 @@ class UnicornDashboard(ez.Collection, Tab):
             (self.PLOT_DECIMATE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
             (self.DEVICE.OUTPUT_MOTION, self.OUTPUT_MOTION),
-            (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY)
+            (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY),
+            (self.DEVICE.OUTPUT_MOTION, self.ORIENTATION.INPUT_MOTION),
         )
     
     def process_components(self) -> typing.Collection[ez.Component]:
         return (self.DEVICE, )
 
 
-if __name__ == '__main__':
+def dashboard() -> None:
     import argparse
     from ezmsg.panel.application import Application, ApplicationSettings
 
@@ -256,14 +275,14 @@ if __name__ == '__main__':
         '--address', '-a',
         type = str,
         help = 'bluetooth address of Unicorn to autoconnect to (XX:XX:XX:XX:XX:XX)',
-        default = None
+        default = 'simulator'
     )
 
     device_group.add_argument(
         '--n_samp',
         type = int,
         help = 'number of data frames per message',
-        default = 50
+        default = 10
     )
 
     class Args:
@@ -289,3 +308,6 @@ if __name__ == '__main__':
         app = APP,
         dashboard = DASHBOARD,
     )
+
+if __name__ == '__main__':
+    dashboard()

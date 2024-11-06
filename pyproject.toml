@@ -1,27 +1,32 @@
-[tool.poetry]
+[project]
 name = "ezmsg-unicorn"
 version = "0.2.0"
 description = "g.tec Unicorn integration for ezmsg"
-authors = ["Miguel Wimbish <miguel.wimbish@jhuapl.edu>", "Griffin Milsap <griffin.milsap@jhuapl.edu>"]
+authors = [
+    { name = "Griffin Milsap", email = "griffin.milsap@gmail.com" },
+    { name = "Miguel Wimbish", email = "miguel.wimbish@jhuapl.edu" },
+]
 readme = "README.md"
-homepage = "https://github.com/griffinmilsap/ezmsg-unicorn"
-packages = [
-  { include = "ezmsg", from = "src" }
+requires-python = ">=3.10"
+dependencies = [
+    "ezmsg>=3.5.0",
+    "pyqt5>=5.15.11; platform_system != 'Linux'",
 ]
 
+[project.optional-dependencies]
+dashboard = [
+    "ezmsg-panel>=0.5.0",
+    "ezmsg-sigproc>=1.4.2",
+    "numpy<2.0.0",
+    "vqf>=2.0.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-ezmsg = "^3.3.3"
-panel = { python = "^3.9", version = "^1.2.3", optional = true }
-ezmsg-sigproc = { version = "^1.2.2", optional = true }
-ezmsg-panel = { python = "^3.9", git = "https://github.com/griffinmilsap/ezmsg-panel.git", rev = "main", optional = true }
+[project.scripts]
+dashboard = "ezmsg.unicorn.dashboard:dashboard"
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry.extras]
-dashboard = [ "ezmsg-sigproc", "ezmsg-panel", "panel" ]
-
-
-[build-system] 
-requires = ["poetry-core"] 
-build-backend = "poetry.core.masonry.api"
+[tool.hatch.build.targets.wheel]
+packages = ["src/ezmsg"]
