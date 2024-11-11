@@ -86,10 +86,8 @@ class UnicornProtocol:
 
     def packet_count(self) -> npt.NDArray:
         """ Decode packet count
-        At some point this would have been a monotonically increasing number representing the 
+        This is a monotonically increasing number representing the 
         current packet number (so that one could check for dropped packets)
-        Instead, I now believe this carries some sort of timestamp in nanoseconds since 
-        the device was powered on.
         """
         count_bytes = self.data_bytes[:, UnicornProtocol.COUNT_OFFSET:UnicornProtocol.FOOTER_OFFSET]
         count = np.frombuffer(count_bytes.copy().data, dtype = np.int32)

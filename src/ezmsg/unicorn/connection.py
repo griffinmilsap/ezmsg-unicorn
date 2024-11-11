@@ -3,9 +3,11 @@ import typing
 import time
 
 from importlib.resources import files
+from dataclasses import dataclass, field
 
 import ezmsg.core as ez
 import numpy as np
+import numpy.typing as npt
 
 from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.util.generator import consumer
@@ -25,6 +27,7 @@ class UnicornConnectionState(ez.State):
     signal_queue: asyncio.Queue[AxisArray]
     motion_queue: asyncio.Queue[AxisArray]
     battery_queue: asyncio.Queue[float]
+    dropped_queue: asyncio.Queue[int]
 
 class UnicornConnection(ez.Unit):
     SETTINGS = UnicornConnectionSettings
@@ -35,6 +38,7 @@ class UnicornConnection(ez.Unit):
     OUTPUT_MOTION = ez.OutputStream(AxisArray)
     OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
     OUTPUT_BATTERY = ez.OutputStream(float)
+    OUTPUT_DROPPED = ez.OutputStream(int)
 
     @ez.subscriber(INPUT_SETTINGS)
     async def on_settings(self, msg: UnicornConnectionSettings) -> None:
@@ -52,7 +56,13 @@ class UnicornConnection(ez.Unit):
             motion = await self.STATE.motion_queue.get()
             yield self.OUTPUT_MOTION, motion
 
-    # NOTE: Subscribers not get a battery update corresponding to every signal/motion update
+    @ez.publisher(OUTPUT_DROPPED)
+    async def pub_dropped(self) -> typing.AsyncGenerator:
+        while True:
+            dropped = await self.STATE.dropped_queue.get()
+            yield self.OUTPUT_DROPPED, dropped
+
+    # NOTE: battery updates every n_samp frames acquired
     @ez.publisher(OUTPUT_BATTERY)
     async def pub_battery(self) -> typing.AsyncGenerator:
         while True:
@@ -89,6 +99,7 @@ class UnicornConnection(ez.Unit):
         self.STATE.signal_queue = asyncio.Queue()
         self.STATE.motion_queue = asyncio.Queue()
         self.STATE.battery_queue = asyncio.Queue()
+        self.STATE.dropped_queue = asyncio.Queue()
 
         await self.reconnect(self.SETTINGS)
 
@@ -143,8 +154,6 @@ class UnicornConnection(ez.Unit):
         except asyncio.CancelledError:
             pass
 
-
-
     @consumer
     def interpolator(self) -> typing.Generator[None, bytes, None]:
         """ As a wireless EEG device, packets WILL be dropped.
@@ -164,13 +173,16 @@ class UnicornConnection(ez.Unit):
             count = decoder.packet_count()
             if last_count is None:
                 last_count = count[0].item() - 1
-            dropped_frames = np.diff(count, prepend = last_count).sum() - len(count)
+            dropped_frames: int = np.diff(count, prepend = last_count).sum() - len(count)
 
             eeg = decoder.eeg()
             motion = decoder.motion()
 
+            interpolated: npt.NDArray[np.bool] = np.array([False] * len(count))
             if dropped_frames > 0:
-                ez.logger.info(f'Unicorn {dropped_frames=}')
+                ez.logger.debug(f'Unicorn {dropped_frames=}')
+                self.STATE.dropped_queue.put_nowait(dropped_frames)
+
                 count_buffer = np.concatenate((np.array([last_count]), count), axis = 0)
 
                 last_eeg_frame = last_eeg_frame if last_eeg_frame.size else eeg[np.newaxis, 0, ...]
@@ -188,6 +200,14 @@ class UnicornConnection(ez.Unit):
                 motion = np.apply_along_axis(interp, 0, motion_buffer)[1:, ...]
                 count = interp_count[1:]
 
+                interpolated = ~np.isin(interp_count, count_buffer)
+
+            # TODO: Jam interpolated into AxisArrays as CoordinateAxes
+            # interpolated_coord = AxisArray.CoordinateAxis(
+            #     data = interpolated,
+            #     dims = ['time']
+            # )
+
             time_axis = AxisArray.Axis.TimeAxis(
                 fs = UnicornProtocol.FS,
                 offset = timestamp - (len(count) / UnicornProtocol.FS)
@@ -196,13 +216,13 @@ class UnicornConnection(ez.Unit):
             self.STATE.signal_queue.put_nowait(AxisArray(
                 data = eeg,
                 dims = ['time', 'ch'],
-                axes = {'time': time_axis}
+                axes = {'time': time_axis},
             ))
 
             self.STATE.motion_queue.put_nowait(AxisArray(
                 data = motion,
                 dims = ['time', 'ch'],
-                axes = {'time': time_axis}
+                axes = {'time': time_axis},
             ))
 
             self.STATE.battery_queue.put_nowait(decoder.battery()[-1].item())
