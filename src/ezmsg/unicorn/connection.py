@@ -163,6 +163,10 @@ class UnicornConnection(ez.Unit):
         last_eeg_frame = np.array([])
         last_motion_frame = np.array([])
         last_count: typing.Optional[int] = None
+
+        TimeAxis = AxisArray.Axis.TimeAxis
+        if hasattr(AxisArray, 'TimeAxis'):
+            TimeAxis = AxisArray.TimeAxis
         
         while True:
             block = yield None
@@ -202,27 +206,29 @@ class UnicornConnection(ez.Unit):
 
                 interpolated = ~np.isin(interp_count, count_buffer)
 
-            # TODO: Jam interpolated into AxisArrays as CoordinateAxes
-            # interpolated_coord = AxisArray.CoordinateAxis(
-            #     data = interpolated,
-            #     dims = ['time']
-            # )
+            axes = {}
 
-            time_axis = AxisArray.Axis.TimeAxis(
+            axes['time'] = TimeAxis(
                 fs = UnicornProtocol.FS,
                 offset = timestamp - (len(count) / UnicornProtocol.FS)
             )
+
+            if hasattr(AxisArray, 'CoordinateAxis'):
+                axes['interpolated'] = AxisArray.CoordinateAxis(
+                    data = interpolated,
+                    dims = ['time']
+                )
                 
             self.STATE.signal_queue.put_nowait(AxisArray(
                 data = eeg,
                 dims = ['time', 'ch'],
-                axes = {'time': time_axis},
+                axes = axes.copy()
             ))
 
             self.STATE.motion_queue.put_nowait(AxisArray(
                 data = motion,
                 dims = ['time', 'ch'],
-                axes = {'time': time_axis},
+                axes = axes.copy()
             ))
 
             self.STATE.battery_queue.put_nowait(decoder.battery()[-1].item())
