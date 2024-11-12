@@ -5,7 +5,7 @@ g.tec Unicorn Hybrid Black integration for ezmsg
 Copyright 2023 JHUAPL; currently not released under an open source license.
 
 ## Install
-```uv sync --extra dashboard```
+```uv sync --all-extras```
 
 ## Run Dashboard
 ```uv run dashboard```
