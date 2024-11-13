@@ -12,7 +12,7 @@ except ImportError:
     ez.logger.warning('install vqf for orientation estimation')
     vqf_exists = False
 
-from ezmsg.util.messages.axisarray import AxisArray
+from ezmsg.util.messages.axisarray import AxisArray, view2d
 
 class VQFFilterSettings(ez.Settings):
     time_axis: typing.Union[str, int] = 'time'
@@ -45,10 +45,11 @@ class VQFFilter(ez.Unit):
         if not self.STATE.vqf or time_axis.axis.gain != self.STATE.vqf.coeffs['gyrTs']:
             self.STATE.vqf = VQF(time_axis.axis.gain)
 
-        data = msg.as2d(self.SETTINGS.time_axis)
-        acc = np.ascontiguousarray(data[:, :3] * 9.8) # Convert from g to m/s^2
-        gyr = np.ascontiguousarray(np.deg2rad(data[:, 3:6])) # Convert from deg/sec to rad/sec
+        motion_data = msg.data.copy()
+        with view2d(motion_data, time_axis.idx) as data:
+            acc = np.ascontiguousarray(data[:, :3] * 9.8) # Convert from g to m/s^2
+            gyr = np.ascontiguousarray(np.deg2rad(data[:, 3:6])) # Convert from deg/sec to rad/sec
+            data[:, :4] = self.STATE.vqf.updateBatch(gyr, acc)['quat6D']
 
-        out = self.STATE.vqf.updateBatch(gyr, acc)
-
-        yield self.OUTPUT_ORIENTATION, replace(msg, data = out['quat6D'])
+        out_data = np.take(motion_data, indices = np.arange(4), axis = time_axis.idx)
+        yield self.OUTPUT_ORIENTATION, replace(msg, data = out_data)
