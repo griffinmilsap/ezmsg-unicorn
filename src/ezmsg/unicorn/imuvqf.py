@@ -16,6 +16,7 @@ from ezmsg.util.messages.axisarray import AxisArray, view2d
 
 class VQFFilterSettings(ez.Settings):
     time_axis: typing.Union[str, int] = 'time'
+    ch_axis: typing.Union[str, int] = 'ch'
 
 class VQFFilterState(ez.State):
     vqf: typing.Optional[VQF] = None
@@ -32,10 +33,10 @@ class VQFFilter(ez.Unit):
     @ez.publisher(OUTPUT_ORIENTATION)
     async def on_motion(self, msg: AxisArray) -> typing.AsyncGenerator:
         # Assumptions: 
-        # * msg has two axes, time and ch -- order doesn't matter
-        # * ch has 6 elements, [accx, accy, accz, gyrx, gyry, gyrz]
+        # * msg has two axes, SETTINGS.time_axis and SETTINGS.ch_axis -- order doesn't matter
+        # * ch has 6 elements, in order, [accx, accy, accz, gyrx, gyry, gyrz]
         # * acc values are in m/s^2
-        # # gyr values are in rad/s
+        # * gyr values are in rad/s
 
         if not vqf_exists: return
 
@@ -51,5 +52,5 @@ class VQFFilter(ez.Unit):
             gyr = np.ascontiguousarray(np.deg2rad(data[:, 3:6])) # Convert from deg/sec to rad/sec
             data[:, :4] = self.STATE.vqf.updateBatch(gyr, acc)['quat6D']
 
-        out_data = np.take(motion_data, indices = np.arange(4), axis = time_axis.idx)
+        out_data = np.take(motion_data, indices = np.arange(4), axis = msg.axis_idx(self.SETTINGS.ch_axis))
         yield self.OUTPUT_ORIENTATION, replace(msg, data = out_data)
