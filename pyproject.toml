@@ -17,7 +17,6 @@ dependencies = [
 dashboard = [
     "ezmsg-panel>=0.5.0",
     "ezmsg-sigproc>=1.4.2",
-    "numpy<2.0.0",
     "vqf>=2.0.0",
 ]
 

@@ -8,7 +8,7 @@ class OrientationPane(JSComponent):
     _bundle = 'OrientationPane.bundle.js'
     _esm = 'orientationpane.js'
 
-    orientation = param.Array(default = np.array([0.0, 0.0, 0.0, 1.0]))
+    orientation = param.List(default = [0.0, 0.0, 0.0, 1.0])
 
     _importmap = {
         "imports": {

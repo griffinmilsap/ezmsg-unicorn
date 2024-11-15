@@ -59,7 +59,7 @@ class StatusPane(ez.Unit):
     @ez.subscriber(INPUT_ORIENTATION)
     async def on_orientation(self, msg: AxisArray) -> None:
         latest_quat = msg.as2d(self.SETTINGS.time_axis)[-1, :]
-        self.STATE.orientation_pane.orientation = latest_quat
+        self.STATE.orientation_pane.orientation = latest_quat.tolist()
         self.STATE.last_signal_time = time.time()
 
     @ez.subscriber(INPUT_BATTERY)
