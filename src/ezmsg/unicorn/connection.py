@@ -35,8 +35,8 @@ class UnicornConnection(ez.Unit):
 
     INPUT_SETTINGS = ez.InputStream(UnicornConnectionSettings)
     
-    OUTPUT_MOTION = ez.OutputStream(AxisArray)
-    OUTPUT_SIGNAL = ez.OutputStream(AxisArray)
+    OUTPUT_MOTION = ez.OutputStream(AxisArray, num_buffers = 2)
+    OUTPUT_SIGNAL = ez.OutputStream(AxisArray, num_buffers = 2)
     OUTPUT_BATTERY = ez.OutputStream(float)
     OUTPUT_DROPPED = ez.OutputStream(int)
 
