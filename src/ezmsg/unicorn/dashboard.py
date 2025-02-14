@@ -30,7 +30,7 @@ class UnicornDashboard(ez.Collection, Tab):
     OUTPUT_BATTERY = ez.OutputStream(float)
     OUTPUT_DROPPED = ez.OutputStream(int)
 
-    PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = '', downsample_factor = 1))
+    PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = '', downsample_factor = 2))
 
     DISCOVERY = UnicornDiscovery()
     DEVICE = Unicorn()
