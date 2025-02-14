@@ -9,7 +9,6 @@ from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 from ezmsg.panel.tabbedapp import Tab
 from ezmsg.sigproc.window import Window, WindowSettings
-from ezmsg.sigproc.decimate import Decimate, DownsampleSettings
 
 from .discovery import UnicornDiscovery, UnicornDiscoverySettings
 from .device import Unicorn, UnicornSettings
@@ -31,11 +30,10 @@ class UnicornDashboard(ez.Collection, Tab):
     OUTPUT_BATTERY = ez.OutputStream(float)
     OUTPUT_DROPPED = ez.OutputStream(int)
 
-    PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = ''))
+    PLOT = TimeSeriesPlot(TimeSeriesPlotSettings(name = '', downsample_factor = 1))
 
     DISCOVERY = UnicornDiscovery()
     DEVICE = Unicorn()
-    PLOT_DECIMATE = Decimate(DownsampleSettings(axis = 'time', factor = 2))
     PLOT_WINDOW = Window()
     STATUS = UnicornStatus()
 
@@ -80,8 +78,7 @@ class UnicornDashboard(ez.Collection, Tab):
         return (
             (self.DISCOVERY.OUTPUT_SETTINGS, self.DEVICE.INPUT_SETTINGS),
             (self.DEVICE.OUTPUT_SIGNAL, self.PLOT_WINDOW.INPUT_SIGNAL),
-            (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT_DECIMATE.INPUT_SIGNAL),
-            (self.PLOT_DECIMATE.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
+            (self.PLOT_WINDOW.OUTPUT_SIGNAL, self.PLOT.INPUT_SIGNAL),
             (self.DEVICE.OUTPUT_SIGNAL, self.OUTPUT_SIGNAL),
             (self.DEVICE.OUTPUT_MOTION, self.OUTPUT_MOTION),
             (self.DEVICE.OUTPUT_BATTERY, self.OUTPUT_BATTERY),
