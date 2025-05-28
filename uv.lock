@@ -1,9 +1,16 @@
 version = 1
+revision = 1
 requires-python = ">=3.10"
 resolution-markers = [
-    "python_full_version < '3.11'",
-    "python_full_version == '3.11.*'",
-    "python_full_version >= '3.12'",
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "(python_full_version < '3.11' and sys_platform == 'cygwin') or (python_full_version < '3.11' and sys_platform == 'win32')",
+    "python_full_version < '3.11' and sys_platform != 'cygwin' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "(python_full_version == '3.11.*' and sys_platform == 'cygwin') or (python_full_version == '3.11.*' and sys_platform == 'win32')",
+    "python_full_version == '3.11.*' and sys_platform != 'cygwin' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+    "(python_full_version >= '3.12' and sys_platform == 'cygwin') or (python_full_version >= '3.12' and sys_platform == 'win32')",
+    "python_full_version >= '3.12' and sys_platform != 'cygwin' and sys_platform != 'darwin' and sys_platform != 'win32'",
 ]
 
 [[package]]
@@ -227,7 +234,8 @@ version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "ezmsg" },
-    { name = "pyqt5", marker = "platform_system != 'Linux'" },
+    { name = "pyqt5", version = "5.15.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'cygwin' or sys_platform == 'win32'" },
+    { name = "pyqt5", version = "5.15.11", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
 ]
 
 [package.optional-dependencies]
@@ -242,9 +250,11 @@ requires-dist = [
     { name = "ezmsg", specifier = ">=3.5.0" },
     { name = "ezmsg-panel", marker = "extra == 'dashboard'", specifier = ">=0.6.0" },
     { name = "ezmsg-sigproc", marker = "extra == 'dashboard'", specifier = ">=1.4.2" },
-    { name = "pyqt5", marker = "platform_system != 'Linux'", specifier = ">=5.15.11" },
+    { name = "pyqt5", marker = "sys_platform == 'cygwin' or sys_platform == 'win32'", specifier = "==5.15.2" },
+    { name = "pyqt5", marker = "sys_platform == 'darwin'", specifier = "==5.15.11" },
     { name = "vqf", marker = "extra == 'dashboard'", specifier = ">=2.0.0" },
 ]
+provides-extras = ["dashboard"]
 
 [[package]]
 name = "idna"
@@ -600,18 +610,35 @@ wheels = [
 
 [[package]]
 name = "pyqt5"
+version = "5.15.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "(python_full_version < '3.11' and sys_platform == 'cygwin') or (python_full_version < '3.11' and sys_platform == 'win32')",
+    "(python_full_version == '3.11.*' and sys_platform == 'cygwin') or (python_full_version == '3.11.*' and sys_platform == 'win32')",
+    "(python_full_version >= '3.12' and sys_platform == 'cygwin') or (python_full_version >= '3.12' and sys_platform == 'win32')",
+]
+dependencies = [
+    { name = "pyqt5-sip", marker = "sys_platform == 'cygwin' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/6c/640e3f5c734c296a7193079a86842a789edb7988dca39eab44579088a1d1/PyQt5-5.15.2.tar.gz", hash = "sha256:372b08dc9321d1201e4690182697c5e7ffb2e0770e6b4a45519025134b12e4fc", size = 3265445 }
+
+[[package]]
+name = "pyqt5"
 version = "5.15.11"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "python_full_version >= '3.12' and sys_platform == 'darwin'",
+]
 dependencies = [
-    { name = "pyqt5-qt5" },
-    { name = "pyqt5-sip" },
+    { name = "pyqt5-qt5", marker = "sys_platform == 'darwin'" },
+    { name = "pyqt5-sip", marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/07/c9ed0bd428df6f87183fca565a79fee19fa7c88c7f00a7f011ab4379e77a/PyQt5-5.15.11.tar.gz", hash = "sha256:fda45743ebb4a27b4b1a51c6d8ef455c4c1b5d610c90d2934c7802b5c1557c52", size = 3216775 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/11/64/42ec1b0bd72d87f87bde6ceb6869f444d91a2d601f2e67cd05febc0346a1/PyQt5-5.15.11-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:c8b03dd9380bb13c804f0bdb0f4956067f281785b5e12303d529f0462f9afdc2", size = 6579776 },
     { url = "https://files.pythonhosted.org/packages/49/f5/3fb696f4683ea45d68b7e77302eff173493ac81e43d63adb60fa760b9f91/PyQt5-5.15.11-cp38-abi3-macosx_11_0_x86_64.whl", hash = "sha256:6cd75628f6e732b1ffcfe709ab833a0716c0445d7aec8046a48d5843352becb6", size = 7016415 },
-    { url = "https://files.pythonhosted.org/packages/f3/f0/ae5a5b4f9b826b29ea4be841b2f2d951bcf5ae1d802f3732b145b57c5355/PyQt5-5.15.11-cp38-abi3-win32.whl", hash = "sha256:76be0322ceda5deecd1708a8d628e698089a1cea80d1a49d242a6d579a40babd", size = 5433308 },
-    { url = "https://files.pythonhosted.org/packages/56/d5/68eb9f3d19ce65df01b6c7b7a577ad3bbc9ab3a5dd3491a4756e71838ec9/PyQt5-5.15.11-cp38-abi3-win_amd64.whl", hash = "sha256:bdde598a3bb95022131a5c9ea62e0a96bd6fb28932cc1619fd7ba211531b7517", size = 6865864 },
 ]
 
 [[package]]
@@ -865,7 +892,7 @@ name = "tqdm"
 version = "4.67.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737 }
 wheels = [

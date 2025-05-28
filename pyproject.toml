@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "ezmsg>=3.5.0",
-    "pyqt5>=5.15.11; platform_system != 'Linux'",
+    'pyqt5==5.15.11; sys_platform == "darwin"',
+    'pyqt5==5.15.2; sys_platform == "win32" or sys_platform == "cygwin"',
 ]
 
 [project.optional-dependencies]
@@ -29,3 +30,5 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ezmsg"]
+
+
