@@ -5,7 +5,19 @@ g.tec Unicorn Hybrid Black integration for ezmsg
 Copyright 2023 JHUAPL; currently not released under an open source license.
 
 ## Install
+Barebones install (really only useful on Linux)
+```uv sync```
+
+If you want a visual dashboard via Panel
+```uv sync --extra dashboard```
+
+If you want to use Qt for a bluetooth-classic abstraction layer
+```uv sync --extra qtbt```
+
+If you want it all
 ```uv sync --all-extras```
+
+
 
 ## Run Dashboard
 ```uv run dashboard```
