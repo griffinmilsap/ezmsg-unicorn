@@ -10,8 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "ezmsg>=3.5.0",
-    'pyqt5==5.15.11; sys_platform == "darwin"',
-    'pyqt5==5.15.2; sys_platform == "win32" or sys_platform == "cygwin"',
 ]
 
 [project.optional-dependencies]
@@ -20,6 +18,12 @@ dashboard = [
     "ezmsg-sigproc>=1.4.2",
     "vqf>=2.0.0",
 ]
+
+qtbt = [
+    'pyqt5==5.15.11; sys_platform == "darwin"',
+    'pyqt5==5.15.2; sys_platform == "win32" or sys_platform == "cygwin"',
+]
+
 
 [project.scripts]
 dashboard = "ezmsg.unicorn.dashboard:dashboard"
