@@ -51,7 +51,7 @@ class NativeUnicornConnection(UnicornConnection):
                     _ = await reader.readexactly(len(UnicornProtocol.START_MSG)) # 0x00 0x00 0x00
 
                     interpolator = self.interpolator()
-                    read_length = UnicornProtocol.PAYLOAD_LENGTH * self.SETTINGS.n_samp
+                    read_length = UnicornProtocol.PAYLOAD_LENGTH * self.STATE.cur_settings.n_samp
                     while True: # Acquisition loop; continue to get data while connected
 
                         if self.STATE.reconnect_event.is_set():
