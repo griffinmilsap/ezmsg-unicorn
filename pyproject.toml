@@ -15,7 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 dashboard = [
     "ezmsg-panel>=0.6.0",
-    "ezmsg-sigproc>=1.4.2",
+    "ezmsg-sigproc<=1.8.2",
     "vqf>=2.0.0",
 ]
 

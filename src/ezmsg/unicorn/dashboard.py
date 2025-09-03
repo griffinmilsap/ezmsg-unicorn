@@ -1,5 +1,6 @@
 import typing
 
+from pathlib import Path
 from dataclasses import field
 
 import ezmsg.core as ez
@@ -8,6 +9,7 @@ import panel as pn
 from ezmsg.util.messages.axisarray import AxisArray
 from ezmsg.panel.timeseriesplot import TimeSeriesPlot, TimeSeriesPlotSettings
 from ezmsg.panel.tabbedapp import Tab
+from ezmsg.panel.recorder import Recorder, RecorderSettings
 from ezmsg.sigproc.window import Window, WindowSettings
 
 from .discovery import UnicornDiscovery, UnicornDiscoverySettings
@@ -37,6 +39,8 @@ class UnicornDashboard(ez.Collection, Tab):
     PLOT_WINDOW = Window()
     STATUS = UnicornStatus()
 
+    RECORDER = Recorder()
+
     def configure(self) -> None:
         self.DEVICE.apply_settings(self.SETTINGS.device_settings)
         self.DISCOVERY.apply_settings(
@@ -60,6 +64,13 @@ class UnicornDashboard(ez.Collection, Tab):
             )
         )
 
+        self.RECORDER.apply_settings(
+            RecorderSettings(
+                data_dir = Path(),
+                name = "Data Recorder"
+            )
+        )
+
     @property
     def title(self) -> str:
         return 'Unicorn Device'
@@ -69,6 +80,11 @@ class UnicornDashboard(ez.Collection, Tab):
             # self.DISCOVERY.controls(), # Unsupported on all but Linux...
             self.STATUS.panel(),
             self.PLOT.sidebar(),
+            pn.Card(
+                self.RECORDER.sidebar(),
+                title = 'Data Recorder',
+                sizing_mode = 'stretch_width',
+            ),
         )
     
     def content(self) -> pn.viewable.Viewable:
@@ -85,7 +101,10 @@ class UnicornDashboard(ez.Collection, Tab):
             (self.DEVICE.OUTPUT_DROPPED, self.OUTPUT_DROPPED),
             (self.DEVICE.OUTPUT_MOTION, self.STATUS.INPUT_MOTION),
             (self.DEVICE.OUTPUT_BATTERY, self.STATUS.INPUT_BATTERY),
-            (self.DEVICE.OUTPUT_DROPPED, self.STATUS.INPUT_DROPPED), 
+            (self.DEVICE.OUTPUT_DROPPED, self.STATUS.INPUT_DROPPED),
+
+            (self.DEVICE.OUTPUT_SIGNAL, self.RECORDER.INPUT_MESSAGE),
+            (self.DEVICE.OUTPUT_MOTION, self.RECORDER.INPUT_MESSAGE) 
         )
     
     def process_components(self) -> typing.Collection[ez.Component]:
@@ -143,7 +162,9 @@ def dashboard() -> None:
         )
     )
 
-    APP.panels = { 'unicorn_device': DASHBOARD.app }
+    APP.panels = { 
+        'unicorn_device': DASHBOARD.app,
+    }
 
     ez.run(
         app = APP,
