@@ -222,13 +222,15 @@ class UnicornConnection(ez.Unit):
             self.STATE.signal_queue.put_nowait(AxisArray(
                 data = eeg,
                 dims = ['time', 'ch'],
-                axes = axes.copy()
+                axes = axes.copy(),
+                key = f'EEG_{self.STATE.cur_settings.address}'
             ))
 
             self.STATE.motion_queue.put_nowait(AxisArray(
                 data = motion,
                 dims = ['time', 'ch'],
-                axes = axes.copy()
+                axes = axes.copy(),
+                key = f'MOTION_{self.STATE.cur_settings.address}'
             ))
 
             self.STATE.battery_queue.put_nowait(decoder.battery()[-1].item())
